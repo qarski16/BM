@@ -7,13 +7,17 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# tanda garis miring (/) di belakang node_modules
+# 📦 PENTING: Menggunakan **/ agar Git mengabaikan node_modules di folder mana pun (root, client, dan server)
+**/node_modules/
 node_modules/
+
+# Build outputs
 dist
 dist-ssr
 *.local
 
-# file .env agar aman tidak ter-upload
+# 🔒 PENTING: Menggunakan **/ agar file .env rahasia di client maupun server tidak bocor
+**/*.env
 .env
 
 # Editor directories and files
