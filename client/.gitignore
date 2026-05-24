@@ -7,10 +7,14 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
+# tanda garis miring (/) di belakang node_modules
+node_modules/
 dist
 dist-ssr
 *.local
+
+# file .env agar aman tidak ter-upload
+.env
 
 # Editor directories and files
 .vscode/*
