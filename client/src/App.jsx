@@ -8,16 +8,27 @@ import PesananMasuk from './pages/PesananMasuk';
 import ManajemenKurir from './pages/ManajemenKurir'; 
 import Laporan from './pages/Laporan';
 import Pengaturan from './pages/Pengaturan';  
+import DashboardKurir from './pages/DashboardKurir'; 
 import './index.css';
 
-// --- KOMPONEN PROTEKSI ROUTE ---
-// Memastikan hanya Admin yang sudah login (punya token) yang bisa masuk
+// --- SATPAM PROTEKSI ROUTE (KHUSUS ADMIN) ---
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   const role = localStorage.getItem('role');
 
-  if (!token || role !== 'Admin') {
-    // Jika tidak ada token atau bukan Admin, lempar ke halaman login
+  // Mengubah ke huruf kecil agar kebal terhadap perbedaan penulisan kapital di database
+  if (!token || !role || role.toLowerCase().trim() !== 'admin') {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
+
+// --- SATPAM PROTEKSI ROUTE (KHUSUS KURIR) ---
+const KurirProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('role');
+
+  if (!token || !role || role.toLowerCase().trim() !== 'kurir') {
     return <Navigate to="/login" replace />;
   }
   return children;
@@ -28,16 +39,21 @@ function App() {
     <Router>
       <Routes>
         {/* --- ROUTES PUBLIK --- */}
-        {/* Halaman Utama: Form untuk user memesan */}
         <Route path="/" element={<FormPesanan />} />
-        
-        {/* Halaman Auth */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
+        {/* --- ROUTE KHUSUS KURIR (DILINDUNGI) --- */}
+        <Route 
+          path="/kurir/dashboard" 
+          element={
+            <KurirProtectedRoute>
+              <DashboardKurir />
+            </KurirProtectedRoute>
+          } 
+        />
+
         {/* --- ADMIN ROUTES (DILINDUNGI) --- */}
-        
-        {/* 1. Dashboard Utama */}
         <Route 
           path="/dashboard" 
           element={
@@ -47,7 +63,6 @@ function App() {
           } 
         />
 
-        {/* 2. Halaman Pesanan Masuk */}
         <Route 
           path="/pesanan-masuk" 
           element={
@@ -57,7 +72,6 @@ function App() {
           } 
         />
 
-        {/* 3. Halaman Manajemen Kurir */}
         <Route
           path="/kurir"
           element={
@@ -67,7 +81,6 @@ function App() {
           } 
         />
 
-        {/* 4. Halaman Laporan (PERBAIKAN: Path huruf kecil & Komponen Laporan) */}
         <Route
           path="/laporan"
           element={
@@ -77,7 +90,6 @@ function App() {
           } 
         />
 
-        {/* 4. Halaman Pengaturan (PERBAIKAN: Path huruf kecil & Komponen Laporan) */}
         <Route
           path="/pengaturan"
           element={
@@ -86,9 +98,8 @@ function App() {
             </ProtectedRoute>
           } 
         />
-        {/* ---------------------------------- */}
 
-        {/* Redirect jika URL tidak ditemukan (Salah ketik URL) */}
+        {/* Catch-All Redirect */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

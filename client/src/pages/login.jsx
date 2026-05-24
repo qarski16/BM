@@ -17,90 +17,90 @@ const Login = () => {
   const onSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Pastikan backend Anda mengirimkan data user beserta role-nya
+      // 1. Kirim data login ke backend
       const res = await axios.post('http://localhost:5000/api/auth/login', formData);
       
-      // 1. Simpan Token dan Role ke localStorage
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('role', res.data.user.role); // Mengambil role dari response backend
+      console.log("Respon Login Backend:", res.data);
 
-      alert('Login Berhasil!');
+      // 2. AMANKAN KREDENSIAL & EKSTRAK NAMA DARI EMAIL
+      const token = res.data.token;
+      const roleRaw = res.data.user?.role || res.data.role || res.data.roleUser || '';
+      const roleValid = roleRaw.toLowerCase().trim();
 
-      // 2. Logika Pengalihan (Redirect) berdasarkan Role
-      if (res.data.user.role === 'Admin') {
-        navigate('/dashboard'); // Arahkan ke Dashboard Admin
+      // Ambil email dari form jika backend tidak mengirim balik data email
+      const userEmail = res.data.user?.email || formData.email || ''; 
+
+      // LOGIKA UTAMA: Potong string email sebelum karakter '@' untuk dijadikan nama panggilan awal
+      let namaPanggilan = "Kurir BM";
+      if (userEmail.includes('@')) {
+        namaPanggilan = userEmail.split('@')[0]; 
+      }
+
+      // Gunakan namaLengkap dari database jika ada, jika tidak ada/baru registrasi pakai potongan email
+      const namaFinal = res.data.user?.namaLengkap || res.data.nama || namaPanggilan;
+
+      // Simpan credentials ke localStorage
+      if (token) localStorage.setItem('token', token);
+      if (roleValid) localStorage.setItem('role', roleValid);
+      localStorage.setItem('nama', namaFinal); 
+      if (userEmail) localStorage.setItem('kurirEmail', userEmail); // Mengamankan email untuk query cadangan
+
+      // Ekstraksi ID Berlapis
+      const idKurir = res.data.user?._id || 
+                      res.data.user?.id || 
+                      res.data._id || 
+                      res.data.id || 
+                      res.data.userId || '';
+                      
+      if (idKurir) {
+        localStorage.setItem('kurirId', idKurir);
       } else {
-        navigate('/kurir-home'); // Arahkan ke halaman Kurir (nanti dibuat)
+        // Jika ID benar-benar tidak dikirim backend, gunakan string email sebagai fallback ID sementara
+        localStorage.setItem('kurirId', userEmail);
+        console.log("[Login] ID Kosong dari backend, menggunakan email sebagai identifier:", userEmail);
+      }
+
+      alert("Login Berhasil!");
+
+      // 3. Pengalihan halaman berdasarkan role hasil sinkronisasi rute App.jsx
+      if (roleValid === 'admin') {
+        navigate('/dashboard'); 
+      } else {
+        navigate('/kurir/dashboard'); 
       }
       
     } catch (err) {
-      alert(err.response?.data?.msg || 'Login Gagal. Periksa Email/Password.');
+      console.error("Error login:", err);
+      alert(err.response?.data?.msg || err.response?.data?.message || "Email atau Password Salah.");
     }
   };
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', margin: 0, padding: 0, overflow: 'hidden' }}>
-      
-      {/* SISI KIRI - GAMBAR FULL */}
-      <div style={{ 
-        flex: 1.2, 
-        position: 'relative', 
-        height: '100%', 
-        backgroundColor: '#2563eb' 
-      }}>
+      {/* SISI KIRI - HERO IMAGE */}
+      <div style={{ flex: 1.2, position: 'relative', height: '100%', backgroundColor: '#2563eb' }}>
         <img 
           src={heroImg} 
           alt="Hero" 
-          style={{ 
-            width: '100%', 
-            height: '100%', 
-            objectFit: 'cover',
-            objectPosition: 'top', 
-            display: 'block'
-          }} 
+          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} 
         />
       </div>
 
       {/* SISI KANAN - FORM LOGIN */}
-      <div style={{ 
-        flex: 1, 
-        display: 'flex', 
-        flexDirection: 'column', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        backgroundColor: '#ffffff' 
-      }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
         <div style={{ width: '100%', maxWidth: '380px', padding: '20px' }}>
-          <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', color: '#333' }}>
-            Login Akun
-          </h2>
-          <p style={{ color: '#666', marginBottom: '30px' }}>Selamat datang kembali di BM Kurir!</p>
+          <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', color: '#333' }}>Selamat Datang!</h2>
+          <p style={{ fontSize: '14px', color: '#666', marginBottom: '30px' }}>Silakan masuk untuk mengakses panel BM Kurir.</p>
           
-          <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <div style={inputGroup}>
               <label style={labelStyle}>Email</label>
-              <input 
-                name="email" 
-                type="email" 
-                placeholder="Masukkan Email Anda" 
-                value={email} 
-                onChange={onChange} 
-                style={inputStyle} 
-                required 
-              />
+              <input name="email" type="email" placeholder="Masukkan Email Anda" value={email} onChange={onChange} style={inputStyle} required />
             </div>
             
             <div style={inputGroup}>
               <label style={labelStyle}>Password</label>
-              <input 
-                name="password" 
-                type="password" 
-                placeholder="Masukkan Password" 
-                value={password} 
-                onChange={onChange} 
-                style={inputStyle} 
-                required 
-              />
+              <input name="password" type="password" placeholder="Masukkan Password Anda" value={password} onChange={onChange} style={inputStyle} required />
             </div>
 
             <button type="submit" style={buttonStyle}>Login</button>
@@ -114,7 +114,7 @@ const Login = () => {
           </button>
 
           <p style={{ marginTop: '25px', textAlign: 'center', fontSize: '14px', color: '#666' }}>
-            Belum punya akun? <Link to="/register" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 'bold' }}>Register</Link>
+            Belum Punya Akun? <Link to="/register" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 'bold' }}>Daftar Sekarang</Link>
           </p>
         </div>
       </div>
@@ -122,7 +122,6 @@ const Login = () => {
   );
 };
 
-// Styles
 const inputGroup = { display: 'flex', flexDirection: 'column', gap: '5px' };
 const labelStyle = { fontSize: '13px', fontWeight: '600', color: '#666' };
 const inputStyle = { padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', width: '100%', boxSizing: 'border-box', outline: 'none' };

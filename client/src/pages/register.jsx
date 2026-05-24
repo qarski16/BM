@@ -18,16 +18,20 @@ const Register = () => {
   const onSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Mengirimkan data registrasi ke backend auth.js
       const res = await axios.post('http://localhost:5000/api/auth/register', formData);
-      alert("Registrasi Berhasil!");
+      
+      // Menggunakan pesan sukses dinamis dari backend (contoh: "Registrasi berhasil sebagai kurir!")
+      alert(res.data.msg || "Registrasi Berhasil!");
       navigate('/login'); 
     } catch (err) {
-      alert(err.response?.data?.msg || "Terjadi kesalahan");
+      // PERBAIKAN: Mengamankan pembacaan pesan error baik dari properti .msg maupun .message bawaan error server
+      const pesanError = err.response?.data?.msg || err.response?.data?.message || "Terjadi kesalahan pada server.";
+      alert(pesanError);
     }
   };
 
   return (
-    // Container utama harus 100vw dan 100vh tanpa margin/padding
     <div style={{ display: 'flex', height: '100vh', width: '100vw', margin: 0, padding: 0, overflow: 'hidden' }}>
       
       {/* SISI KIRI - GAMBAR FULL */}
@@ -35,7 +39,7 @@ const Register = () => {
         flex: 1.2, 
         position: 'relative', 
         height: '100%', 
-        backgroundColor: '#2563eb' // Biru dasar
+        backgroundColor: '#2563eb' 
       }}>
         <img 
           src={heroImg} 
@@ -43,8 +47,8 @@ const Register = () => {
           style={{ 
             width: '100%', 
             height: '100%', 
-            objectFit: 'cover', // Membuat gambar memenuhi seluruh area kiri tanpa spasi putih
-            objectPosition: 'top', // Memastikan bagian atas (teks BM KURIR) menjadi prioritas
+            objectFit: 'cover', 
+            objectPosition: 'top', 
             display: 'block'
           }} 
         />
@@ -67,17 +71,40 @@ const Register = () => {
           <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <div style={inputGroup}>
               <label style={labelStyle}>Nama Lengkap</label>
-              <input name="namaLengkap" placeholder="Masukkan Nama Lengkap" value={namaLengkap} onChange={onChange} style={inputStyle} required />
+              <input 
+                name="namaLengkap" 
+                placeholder="Masukkan Nama Lengkap" 
+                value={namaLengkap} 
+                onChange={onChange} 
+                style={inputStyle} 
+                required 
+              />
             </div>
             
             <div style={inputGroup}>
               <label style={labelStyle}>Email</label>
-              <input name="email" type="email" placeholder="Masukkan Email" value={email} onChange={onChange} style={inputStyle} required />
+              <input 
+                name="email" 
+                type="email" 
+                placeholder="Masukkan Email" 
+                value={email} 
+                onChange={onChange} 
+                style={inputStyle} 
+                required 
+              />
             </div>
             
             <div style={inputGroup}>
               <label style={labelStyle}>Password</label>
-              <input name="password" type="password" placeholder="Buat Password" value={password} onChange={onChange} style={inputStyle} required />
+              <input 
+                name="password" 
+                type="password" 
+                placeholder="Buat Password" 
+                value={password} 
+                onChange={onChange} 
+                style={inputStyle} 
+                required 
+              />
             </div>
 
             <button type="submit" style={buttonStyle}>Register</button>
@@ -99,10 +126,10 @@ const Register = () => {
   );
 };
 
-// Styling Object untuk implementasi materi React (JSX & State) [cite: 19, 20]
+// Styles
 const inputGroup = { display: 'flex', flexDirection: 'column', gap: '5px' };
 const labelStyle = { fontSize: '13px', fontWeight: '600', color: '#666' };
-const inputStyle = { padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', width: '100%', boxSizing: 'border-box' };
+const inputStyle = { padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', width: '100%', boxSizing: 'border-box', outline: 'none' };
 const buttonStyle = { padding: '14px', borderRadius: '8px', border: 'none', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '16px', marginTop: '10px' };
 const googleButtonStyle = { padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', backgroundColor: 'white', color: '#444', fontWeight: '600', cursor: 'pointer', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' };
 

@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
+  // 🛠️ DEFINISI: _id sebagai String kustom untuk menerima teks murni "BM001"
+  _id: {
+    type: String,
+    required: true
+  },
   namaLengkap: {
     type: String,
     required: true
@@ -16,36 +21,24 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Admin', 'Kurir', 'User'], // Membatasi pilihan role
-    default: 'Kurir' // Berdasarkan desain Anda, pendaftar baru biasanya kurir
+    enum: ['admin', 'kurir'],
+    default: 'kurir'
   },
-  
-  // --- TAMBAHAN UNTUK FITUR KURIR ---
-  
-  status: {
+  // Properti operasional kurir realtime
+  statusOnline: {
     type: String,
     enum: ['Online', 'Offline', 'Mengantar'],
-    default: 'Offline' // Status default saat pertama kali daftar
+    default: 'Offline' // ✅ Sinkron dengan aturan Enum
   },
-  lokasiTerakhir: {
-    type: String,
-    default: 'Parepare' // Bisa diupdate koordinat atau nama daerah
-  },
-  tugasAktif: {
-    type: Number,
-    default: 0 // Jumlah pesanan yang sedang dibawa kurir
-  },
-  komisi: {
-    type: Number,
-    default: 0 // Untuk bar progress "Komisi Sistem" di desain Anda
-  },
-  
-  // ----------------------------------
-
-  createdAt: {
+  tanggalDibuat: {
     type: Date,
     default: Date.now
   }
+}, { 
+  _id: false // 🚫 Beritahu Mongoose untuk tidak membuat Auto-ObjectId bawaan pada schema ini
 });
 
-module.exports = mongoose.model('User', UserSchema);
+// 🛠️ PERBAIKAN UTAMA: Cegah OverwriteModelError saat server di-restart / auto-reload
+const User = mongoose.models.User || mongoose.model('User', UserSchema);
+
+module.exports = User;
