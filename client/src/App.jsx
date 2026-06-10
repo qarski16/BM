@@ -11,24 +11,53 @@ import Pengaturan from './pages/Pengaturan';
 import DashboardKurir from './pages/DashboardKurir'; 
 import './index.css';
 
-// --- SATPAM PROTEKSI ROUTE (KHUSUS ADMIN) ---
-const ProtectedRoute = ({ children }) => {
+// =========================================================================
+// 🛡️ FUNGSI PEMERIKSA KEAWETAN SESI LOGIN (ANTI-LOGOUT SAAT REFRESH)
+// =========================================================================
+const checkSesiValid = () => {
   const token = localStorage.getItem('token');
+  const loginTime = localStorage.getItem('loginTime');
+
+  if (!token) return false;
+
+  // JIKA ADA TIMESTAMP LOGIN, CEK APAKAH SUDAH KEDALUWARSA (MISAL: BATASAN 2 JAM)
+  if (loginTime) {
+    const batasWaktuSesi = 2 * 60 * 60 * 1000; // 2 Jam dihitung dalam milidetik
+    const waktuSekarang = new Date().getTime();
+
+    // Jika waktu saat ini dikurangi waktu login ternyata melebihi 2 jam
+    if (waktuSekarang - parseInt(loginTime) > batasWaktuSesi) {
+      console.log("Sesi login Anda telah kedalwarsa. Menghapus storage...");
+      localStorage.clear(); // Bersihkan data usang agar aman
+      return false;
+    }
+  }
+
+  return true; // Sesi dinyatakan lolos dan aman digunakan
+};
+
+// =========================================================================
+// 👮 SATPAM PROTEKSI ROUTE (KHUSUS ADMIN - FIX LOGOUT HARIAN)
+// =========================================================================
+const ProtectedRoute = ({ children }) => {
+  const isTokenValid = checkSesiValid();
   const role = localStorage.getItem('role');
 
-  // Mengubah ke huruf kecil agar kebal terhadap perbedaan penulisan kapital di database
-  if (!token || !role || role.toLowerCase().trim() !== 'admin') {
+  // Evaluasi validitas token serta kecocokan role admin
+  if (!isTokenValid || !role || role.toLowerCase().trim() !== 'admin') {
     return <Navigate to="/login" replace />;
   }
   return children;
 };
 
-// --- SATPAM PROTEKSI ROUTE (KHUSUS KURIR) ---
+// =========================================================================
+// 👮 SATPAM PROTEKSI ROUTE (KHUSUS KURIR - FIX LOGOUT HARIAN)
+// =========================================================================
 const KurirProtectedRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
+  const isTokenValid = checkSesiValid();
   const role = localStorage.getItem('role');
 
-  if (!token || !role || role.toLowerCase().trim() !== 'kurir') {
+  if (!isTokenValid || !role || role.toLowerCase().trim() !== 'kurir') {
     return <Navigate to="/login" replace />;
   }
   return children;

@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
-  // 🛠️ DEFINISI: _id sebagai String kustom untuk menerima teks murni "BM001"
+  // 🛠️ DEFINISI: _id sebagai String kustom untuk menerima teks murni seperti "BM001"
   _id: {
     type: String,
     required: true
@@ -28,7 +28,7 @@ const UserSchema = new mongoose.Schema({
   statusOnline: {
     type: String,
     enum: ['Online', 'Offline', 'Mengantar'],
-    default: 'Offline' // ✅ Sinkron dengan aturan Enum
+    default: 'Offline'
   },
   tanggalDibuat: {
     type: Date,

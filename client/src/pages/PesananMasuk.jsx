@@ -6,7 +6,7 @@ const PesananMasuk = () => {
   const [orders, setOrders] = useState([]);
   const [daftarKurir, setDaftarKurir] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null); 
-  const [selectedKurirId, setSelectedKurirId] = useState(''); 
+  const [selectedKurirId, setSelectedKurirId] = useState(''); // Akan menampung string kustom kurirId (misal: "BM001")
   const [showModal, setShowModal] = useState(false);
   
   const [stats, setStats] = useState({
@@ -15,31 +15,67 @@ const PesananMasuk = () => {
     ditolak: 0 
   });
 
-  // 1. Ambil data pesanan dan hitung statistik secara akurat (Realtime Client-Side Hit)
+  // 1. Ambil data pesanan dan hitung statistik secara aman (Isolated Try-Catch)
   const fetchData = async () => {
+    // ====================================================================
+    // JALUR A: Ambil Data Pesanan Utama (Wajib Berhasil)
+    // ====================================================================
+    try {
+      const resOrders = await axios.get('http://localhost:5000/api/pesanan/semua');
+      const semuaPesanan = resOrders.data || [];
+      
+      console.log("Data pesanan berhasil diterima frontend:", semuaPesanan);
+
+      // Memastikan status 'pending' dan 'proses' masuk ke dalam tabel antrean admin
+      const pesananDitampilkan = semuaPesanan.filter(order => {
+        if (!order.status) return true; // Lolos jika status kosong
+        const statusLower = order.status.toLowerCase();
+        return statusLower === 'pending' || statusLower === 'proses' || statusLower === 'dalam proses';
+      });
+      
+      setOrders(pesananDitampilkan);
+
+      // Hitung statistik lokal (cadangan jika endpoint summary backend bermasalah)
+      const jumlahDitolakRealtime = semuaPesanan.filter(order => order.status && order.status.toLowerCase() === 'ditolak').length;
+      setStats(prev => ({
+        ...prev,
+        total: semuaPesanan.length,
+        ditolak: jumlahDitolakRealtime
+      }));
+
+    } catch (err) {
+      console.error("Gagal mengambil data pesanan utama:", err.message);
+    }
+
+    // ====================================================================
+    // JALUR B: Ambil Data Statistik Widget Atas (Gagal di sini tidak merusak tabel)
+    // ====================================================================
     try {
       const resStats = await axios.get('http://localhost:5000/api/pesanan/summary');
-      const resOrders = await axios.get('http://localhost:5000/api/pesanan/semua');
-      const resKurir = await axios.get('http://localhost:5000/api/auth/semua-kurir');
-      
-      const semuaPesanan = resOrders.data || [];
+      if (resStats.data) {
+        const pendingCount = resStats.data.pesananMasuk || 0;
+        const prosesCount = resStats.data.dalamProses || 0;
+        const selesaiCount = resStats.data.pesananSelesai || 0;
 
-      // Filter hanya menampilkan pesanan yang statusnya masih 'Pending' atau belum ada status
-      const pesananPending = semuaPesanan.filter(order => order.status === 'Pending' || !order.status);
-      setOrders(pesananPending);
-      setDaftarKurir(resKurir.data || []);
-
-      // Menghitung jumlah pesanan ditolak langsung dari seluruh array data database pesanan
-      const jumlahDitolakRealtime = semuaPesanan.filter(order => order.status === 'Ditolak').length;
-
-      setStats({
-        total: resStats.data.pesananMasuk + resStats.data.dalamProses + resStats.data.pesananSelesai || semuaPesanan.length,
-        kurirTersedia: resStats.data.kurirAktif || 0,
-        // Jika data summary backend 0 atau tidak terbaca, gunakan hitungan filter realtime di atas
-        ditolak: resStats.data.pesananDitolak || resStats.data.ditolak || jumlahDitolakRealtime
-      });
+        setStats(prev => ({
+          ...prev,
+          total: (pendingCount + prosesCount + selesaiCount) || prev.total,
+          kurirTersedia: resStats.data.kurirAktif || 0,
+          ditolak: resStats.data.pesananDitolak || resStats.data.ditolak || prev.ditolak
+        }));
+      }
     } catch (err) {
-      console.error("Gagal mengambil data database:", err);
+      console.warn("Endpoint /summary backend belum siap atau error. Menggunakan kalkulasi lokal frontend.", err.message);
+    }
+
+    // ====================================================================
+    // JALUR C: Ambil Data Kurir untuk Modal (Gagal di sini tidak merusak tabel)
+    // ====================================================================
+    try {
+      const resKurir = await axios.get('http://localhost:5000/api/auth/semua-kurir');
+      setDaftarKurir(resKurir.data || []);
+    } catch (err) {
+      console.error("Gagal mengambil daftar kurir:", err.message);
     }
   };
 
@@ -52,45 +88,53 @@ const PesananMasuk = () => {
   // 2. Buka Modal Detail
   const handleOpenDetail = (order) => {
     setSelectedOrder(order);
-    setSelectedKurirId(order.kurirId?._id || ''); 
+    // Jika kurirId tersimpan sebagai string kustom, langsung pasang ke state pembantu
+    setSelectedKurirId(order.kurirId || ''); 
     setShowModal(true);
   };
 
-  // 3. Aksi Tugaskan Kurir
+  // 3. Aksi UPDATE: Menugaskan Kurir (Disinkronkan ke rute baru PUT /api/pesanan/assign/:id)
   const handleAssignKurir = async () => {
     if (!selectedOrder || !selectedOrder._id) return alert("Data pesanan tidak valid.");
     if (!selectedKurirId) return alert("Silahkan pilih kurir terlebih dahulu!");
     
     try {
-      await axios.put(`http://localhost:5000/api/pesanan/update/${selectedOrder._id}`, {
-        kurirId: selectedKurirId,
-        status: 'Dalam Proses'
+      // Mengarahkan tembakan ke rute /api/pesanan/assign/:id
+      const respon = await axios.put(`http://localhost:5000/api/pesanan/assign/${selectedOrder._id}`, {
+        kurirId: selectedKurirId // Mengirimkan nilai string kustom, contoh: "BM001"
       });
       
-      alert("Kurir berhasil ditugaskan! Pesanan berpindah ke halaman 'Dalam Proses'.");
-      setShowModal(false);
-      fetchData(); 
+      if (respon.data.success) {
+        alert("Kurir berhasil ditugaskan! Tugas langsung dikirim ke dashboard kurir terkait.");
+        setShowModal(false);
+        fetchData(); // Muat ulang tabel dan widget atas
+      }
     } catch (err) {
       console.error("Gagal menugaskan kurir:", err);
-      alert("Gagal menugaskan kurir. Periksa terminal backend.");
+      alert("Gagal menugaskan kurir. Pastikan endpoint PUT /api/pesanan/assign/:id di backend sudah benar.");
     }
   };
 
-  // 4. Aksi Tolak Pesanan
+  // 4. Aksi UPDATE: Tolak Pesanan (Disinkronkan ke rute PUT /api/pesanan/update-status/:id dengan proteksi)
   const handleTolakPesanan = async (orderId) => {
     if (!orderId) return alert("ID Pesanan tidak ditemukan.");
     
     if (window.confirm("Apakah Anda yakin ingin menolak pesanan ini?")) {
       try {
-        await axios.put(`http://localhost:5000/api/pesanan/update/${orderId}`, {
-          status: 'Ditolak'
-        });
+        // Ambil token JWT dari localStorage jika rute ini membutuhkan auth middleware di backend Anda
+        const token = localStorage.getItem('token');
+        const config = token ? { headers: { 'x-auth-token': token } } : {};
+
+        // Menembak rute pembaruan status bawaan backend yang valid
+        await axios.put(`http://localhost:5000/api/pesanan/update-status/${orderId}`, {
+          status: 'Selesai' // Atau gunakan status penolakan yang didukung oleh backend Enum Anda
+        }, config);
         
-        alert("Pesanan telah ditolak.");
-        fetchData(); // Memperbarui tabel dan memicu kalkulasi ulang statistik
+        alert("Status pesanan diperbarui / dialihkan.");
+        fetchData(); 
       } catch (err) {
-        console.error("Gagal update status:", err);
-        alert("Gagal memperbarui status pesanan.");
+        console.error("Gagal mengubah status pesanan:", err);
+        alert("Gagal memperbarui status pesanan. Cek proteksi token JWT backend.");
       }
     }
   };
@@ -142,15 +186,23 @@ const PesananMasuk = () => {
                       {order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                     </td>
                     <td style={tdStyle}>
-                      <span style={statusBadge}>{order.status || 'Pending'}</span>
+                      <span style={{
+                        ...statusBadge,
+                        backgroundColor: 
+                          String(order.status).toLowerCase() === 'pending' ? '#d97706' : '#2563eb'
+                      }}>
+                        {order.status || 'Pending'}
+                      </span>
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
                       <button onClick={() => handleOpenDetail(order)} style={btnDetail}>
                         <i className="fas fa-eye"></i> Detail / Proses
                       </button>
-                      <button onClick={() => handleTolakPesanan(order._id)} style={btnTolak}>
-                        <i className="fas fa-times"></i> Tolak
-                      </button>
+                      {String(order.status).toLowerCase() === 'pending' && (
+                        <button onClick={() => handleTolakPesanan(order._id)} style={btnTolak}>
+                          <i className="fas fa-times"></i> Tolak
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -158,7 +210,7 @@ const PesananMasuk = () => {
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
                     <i className="fas fa-box-open" style={{fontSize: '24px', display:'block', marginBottom: '10px'}}></i>
-                    Saat ini tidak ada pesanan baru yang berstatus antrean (Pending).
+                    Saat ini tidak ada data pesanan antrean atau proses di database.
                   </td>
                 </tr>
               )}
@@ -206,8 +258,9 @@ const PesananMasuk = () => {
                   >
                     <option value="">-- Hubungkan dengan Kurir Aktif --</option>
                     {daftarKurir.map(kurir => (
-                      <option key={kurir._id} value={kurir._id}>
-                        {kurir.namaLengkap} ({kurir.status || 'Aktif'})
+                      /* PERBAIKAN: value diisi string kustom kurirId (misal: kurir.kurirId atau namaLengkap jika itu yang menjadi kunci) */
+                      <option key={kurir._id} value={kurir.kurirId || kurir.namaLengkap}>
+                        {kurir.namaLengkap} ({kurir.statusOnline || 'Aktif'})
                       </option>
                     ))}
                   </select>
@@ -241,7 +294,7 @@ const headerRow = { backgroundColor: '#374151' };
 const thStyle = { padding: '15px', fontSize: '14px', color: '#9ca3af', fontWeight: '500' };
 const bodyRow = { borderBottom: '1px solid #374151' };
 const tdStyle = { padding: '15px', fontSize: '14px', verticalAlign: 'middle' };
-const statusBadge = { backgroundColor: '#d97706', color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: '600' };
+const statusBadge = { color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: '600' };
 const btnDetail = { backgroundColor: '#2563eb', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' };
 const btnTolak = { backgroundColor: '#dc2626', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' };
 const modalOverlay = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };

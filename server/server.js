@@ -1,7 +1,11 @@
+// =========================================================================
+// ⚠️ WAJIB DI BARIS 1: Load file .env sebelum modul apa pun di-import!
+// =========================================================================
+require('dotenv').config(); 
+
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db'); 
-require('dotenv').config();
 
 const app = express();
 
@@ -13,44 +17,35 @@ app.use(cors());
 app.use(express.json()); 
 
 // --- 🌐 REGISTRASI RUTE API UTAMA ---
-
-// Seluruh endpoint otentikasi, profil, dan status dialihkan ke routes/authRoutes.js
-app.use('/api/auth', require('./routes/authRoutes'));
-
-// Rute Pesanan (Form Pesanan Publik)
+// Sekarang rute ini aman membaca GOOGLE_CLIENT_ID & SECRET dari .env
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/pesanan', require('./routes/pesanan')); 
 
 
 // =========================================================================
 // 🔄 PENYESUAIAN RUTE UPDATE PESANAN (MENDUKUNG ID KURIR STRING "BM001")
 // =========================================================================
-// Rute ini tetap dipertahankan di server.js jika rute pesanan belum dipindah ke controller tersendiri
 app.put('/api/pesanan/update/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, kurirId } = req.body; // kurirId yang dikirim sekarang berupa teks seperti "BM001"
+        const { status, kurirId } = req.body; 
         const mongoose = require('mongoose');
 
-        // Validasi apakah ID pesanan berbentuk ObjectId MongoDB yang valid
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).json({ message: 'Format ID Pesanan tidak valid' });
         }
 
         const db = mongoose.connection.db;
         
-        // Cari tahu nama collection pesanan secara dinamis (biasanya 'pesanans')
         const collections = await db.listCollections().toArray();
         const collectionName = collections.find(c => c.name === 'pesanans' || c.name === 'orders' || c.name === 'pesanan')?.name || 'pesanans';
 
-        // Susun data pembaharuan
         const updateData = {};
         if (status) updateData.status = status;
         
         if (kurirId) {
-            // 🛠️ PERBAIKAN PENTING: Jika kurirId diawali dengan 'BM', simpan sebagai STRING MURNI.
-            // Jika bukan (misal id pesanan lain atau legacy data), baru dikonversi ke ObjectId.
             if (kurirId.startsWith('BM') || kurirId.startsWith('ADM')) {
-                updateData.kurirId = kurirId; // Tersimpan rapi sebagai "BM001"
+                updateData.kurirId = kurirId; 
             } else if (mongoose.Types.ObjectId.isValid(kurirId)) {
                 updateData.kurirId = new mongoose.Types.ObjectId(kurirId);
             }

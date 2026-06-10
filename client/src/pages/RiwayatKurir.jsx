@@ -11,12 +11,16 @@ const RiwayatKurir = () => {
 
   // Mengambil data riwayat dari database lokal backend
   const fetchRiwayat = async () => {
-    if (!kurirId) return;
+    if (!kurirId) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
       const config = token ? { headers: { 'Authorization': `Bearer ${token}` } } : {};
       
+      // Menembak endpoint riwayat yang sudah diperbarui
       const response = await axios.get(`http://localhost:5000/api/pesanan/kurir/riwayat/${kurirId}`, config);
       setRiwayat(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
@@ -33,18 +37,28 @@ const RiwayatKurir = () => {
   // --- LOGIKA PERHITUNGAN STATISTIK DARI DATABASE ---
   const totalPengantaran = riwayat.length;
   const selesaiCount = riwayat.filter(item => item.status?.toLowerCase() === 'selesai').length;
-  const prosesCount = riwayat.filter(item => item.status?.toLowerCase() === 'dalam perjalanan' || item.status?.toLowerCase() === 'proses').length;
-  const ratingKurir = "4.9"; // Opsional: Bisa diambil dari field database profil kurir jika ada
+  
+  // Menghitung status pengantaran aktif yang sedang berjalan
+  const prosesCount = riwayat.filter(item => 
+    item.status?.toLowerCase() === 'proses' || 
+    item.status?.toLowerCase() === 'ambil barang' || 
+    item.status?.toLowerCase() === 'dalam perjalanan' ||
+    item.status?.toLowerCase() === 'sampai tujuan'
+  ).length;
+  
+  // Default "-" karena belum ada fitur ulasan/penilaian di database
+  const ratingKurir = "-"; 
 
-  // --- LOGIKA FILTER PENCARIAN ---
+  // --- LOGIKA FILTER PENCARIAN AMAN ---
   const riwayatFilter = riwayat.filter(item => {
     const searchWord = pencarian.toLowerCase();
-    return (
-      (item._id && item._id.toLowerCase().includes(searchWord)) ||
-      (item.namaLengkap && item.namaLengkap.toLowerCase().includes(searchWord)) ||
-      (item.customer && item.customer.toLowerCase().includes(searchWord)) ||
-      (item.alamat && item.alamat.toLowerCase().includes(searchWord))
-    );
+    
+    const idMatch = item._id ? item._id.toLowerCase().includes(searchWord) : false;
+    const namaMatch = item.namaLengkap ? item.namaLengkap.toLowerCase().includes(searchWord) : false;
+    const customerMatch = item.customer ? item.customer.toLowerCase().includes(searchWord) : false;
+    const alamatMatch = item.alamat ? item.alamat.toLowerCase().includes(searchWord) : false;
+
+    return idMatch || namaMatch || customerMatch || alamatMatch;
   });
 
   if (loading) {
@@ -97,7 +111,7 @@ const RiwayatKurir = () => {
           <div>
             <span style={cardLabel}>Rating</span>
             <h3 style={cardValue}>{ratingKurir}</h3>
-            <span style={cardSub}>Dari 5.0</span>
+            <span style={cardSub}>{ratingKurir === "-" ? "Belum Ada Penilaian" : "Dari 5.0"}</span>
           </div>
         </div>
       </div>
@@ -130,7 +144,6 @@ const RiwayatKurir = () => {
             {riwayatFilter.length > 0 ? (
               riwayatFilter.map((item, index) => (
                 <tr key={item._id || index} style={trRowStyle}>
-                  {/* Memotong ID MongoDB agar tidak terlalu panjang, mirip kode ORD001 */}
                   <td style={{ ...tdStyle, fontWeight: 'bold', color: '#4b5563' }}>
                     {item._id ? `ORD-${item._id.substring(item._id.length - 6).toUpperCase()}` : `ORD-00${index+1}`}
                   </td>
@@ -147,11 +160,11 @@ const RiwayatKurir = () => {
                       backgroundColor: item.status?.toLowerCase() === 'selesai' ? '#dcfce7' : '#fef3c7',
                       color: item.status?.toLowerCase() === 'selesai' ? '#15803d' : '#b45309'
                     }}>
-                      {item.status || 'Selesai'}
+                      {item.status || 'Proses'}
                     </span>
                   </td>
                   <td style={{ ...tdStyle, color: '#64748b', fontSize: '13px' }}>
-                    {item.tanggalDibuat ? new Date(item.tanggalDibuat).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '24 April 2026'}
+                    {item.createdAt ? new Date(item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
                   </td>
                 </tr>
               ))
@@ -169,7 +182,7 @@ const RiwayatKurir = () => {
   );
 };
 
-// --- OBJECT CSS STYLING (MENYESUAIKAN GAMBAR MOCK-UP) ---
+// --- OBJECT CSS STYLING ---
 const mainContentStyle = { padding: '30px', backgroundColor: '#f3f4f6', minHeight: '100vh', fontFamily: 'sans-serif' };
 const statsContainer = { display: 'flex', gap: '20px', marginBottom: '30px', flexWrap: 'wrap' };
 const cardStyle = { flex: 1, minWidth: '200px', backgroundColor: 'white', borderRadius: '8px', padding: '20px', display: 'flex', alignItems: 'center', gap: '15px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' };
@@ -177,11 +190,9 @@ const iconBox = { width: '45px', height: '45px', borderRadius: '8px', background
 const cardLabel = { fontSize: '12px', color: '#6b7280', fontWeight: '500' };
 const cardValue = { margin: '2px 0', fontSize: '22px', fontWeight: 'bold', color: '#111827' };
 const cardSub = { fontSize: '11px', color: '#9ca3af' };
-
 const searchWrapper = { position: 'relative', marginBottom: '20px', maxWidth: '500px' };
 const searchIcon = { position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' };
-const inputSearchStyle = { width: '100%', padding: '12px 12px 12px 40px', borderRadius: '25px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none', backgroundColor: '#fff' };
-
+const inputSearchStyle = { width: '100%', padding: '12px 12px 12px 40px', borderRadius: '25px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none', backgroundColor: '#fff', boxSizing: 'border-box' };
 const tableContainer = { backgroundColor: 'white', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' };
 const tableStyle = { width: '100%', borderCollapse: 'collapse', textAlign: 'left' };
 const thRowStyle = { backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' };

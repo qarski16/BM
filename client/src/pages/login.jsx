@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; 
 import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom'; 
 import heroImg from '../assets/hero-kurir.png'; 
 
 const Login = () => {
@@ -10,59 +10,95 @@ const Login = () => {
   });
 
   const navigate = useNavigate();
+  const location = useLocation(); 
   const { email, password } = formData;
+
+  // =========================================================================
+  // 🌐 LOGIKA MENANGKAP LEMPARAN DATA LOGIN GOOGLE DARI BACKEND
+  // =========================================================================
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+    
+    if (token) {
+      const idKurir = params.get('id');
+      const namaFinal = params.get('nama') || 'Kurir BM';
+      const roleRaw = params.get('role') || 'kurir';
+      const roleValid = roleRaw.toLowerCase().trim();
+
+      // ⭐ DI-UPDATE: Rekam waktu tepat saat login berhasil (Waktu Sekarang dalam milidetik)
+      const waktuSekarang = new Date().getTime();
+
+      // Amankan kredensial login Google ke localStorage
+      localStorage.setItem('token', token);
+      localStorage.setItem('role', roleValid);
+      localStorage.setItem('nama', namaFinal);
+      localStorage.setItem('loginTime', waktuSekarang.toString()); // 👈 BARU: Mengunci durasi login agar tidak logout sendiri saat refresh
+      
+      if (idKurir) {
+        localStorage.setItem('kurirId', idKurir);
+      }
+
+      alert(`Login Berhasil!\nSelamat Datang, ${namaFinal}!`);
+
+      if (roleValid === 'admin') {
+        navigate('/dashboard');
+      } else {
+        navigate('/kurir/dashboard');
+      }
+    }
+  }, [location, navigate]);
+
+  // =========================================================================
+  // 🌐 AKSI KLIK TOMBOL GOOGLE
+  // =========================================================================
+  const handleGoogleLogin = () => {
+    window.location.href = 'http://localhost:5000/api/auth/google';
+  };
 
   const onChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
+  // =========================================================================
+  // 🔐 LOGIKA LOGIN MANUAL (DIPERBARUI DENGAN TIMESTAMP KEEPALIVE)
+  // =========================================================================
   const onSubmit = async (e) => {
     e.preventDefault();
     try {
-      // 1. Kirim data login ke backend
       const res = await axios.post('http://localhost:5000/api/auth/login', formData);
-      
       console.log("Respon Login Backend:", res.data);
 
-      // 2. AMANKAN KREDENSIAL & EKSTRAK NAMA DARI EMAIL
       const token = res.data.token;
       const roleRaw = res.data.user?.role || res.data.role || res.data.roleUser || '';
       const roleValid = roleRaw.toLowerCase().trim();
-
-      // Ambil email dari form jika backend tidak mengirim balik data email
       const userEmail = res.data.user?.email || formData.email || ''; 
 
-      // LOGIKA UTAMA: Potong string email sebelum karakter '@' untuk dijadikan nama panggilan awal
       let namaPanggilan = "Kurir BM";
       if (userEmail.includes('@')) {
         namaPanggilan = userEmail.split('@')[0]; 
       }
 
-      // Gunakan namaLengkap dari database jika ada, jika tidak ada/baru registrasi pakai potongan email
       const namaFinal = res.data.user?.namaLengkap || res.data.nama || namaPanggilan;
+      
+      // ⭐ DI-UPDATE: Rekam waktu tepat saat login manual berhasil
+      const waktuSekarang = new Date().getTime();
 
-      // Simpan credentials ke localStorage
       if (token) localStorage.setItem('token', token);
       if (roleValid) localStorage.setItem('role', roleValid);
       localStorage.setItem('nama', namaFinal); 
-      if (userEmail) localStorage.setItem('kurirEmail', userEmail); // Mengamankan email untuk query cadangan
+      localStorage.setItem('loginTime', waktuSekarang.toString()); // 👈 BARU: Menandai awal sesi aktif browser Anda
+      if (userEmail) localStorage.setItem('kurirEmail', userEmail);
 
-      // Ekstraksi ID Berlapis
-      const idKurir = res.data.user?._id || 
-                      res.data.user?.id || 
-                      res.data._id || 
-                      res.data.id || 
-                      res.data.userId || '';
-                      
+      const idKurir = res.data.user?._id || res.data.user?.id || res.data._id || res.data.id || res.data.userId || '';
+                        
       if (idKurir) {
         localStorage.setItem('kurirId', idKurir);
       } else {
-        // Jika ID benar-benar tidak dikirim backend, gunakan string email sebagai fallback ID sementara
         localStorage.setItem('kurirId', userEmail);
         console.log("[Login] ID Kosong dari backend, menggunakan email sebagai identifier:", userEmail);
       }
 
       alert("Login Berhasil!");
 
-      // 3. Pengalihan halaman berdasarkan role hasil sinkronisasi rute App.jsx
       if (roleValid === 'admin') {
         navigate('/dashboard'); 
       } else {
@@ -90,7 +126,7 @@ const Login = () => {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
         <div style={{ width: '100%', maxWidth: '380px', padding: '20px' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', color: '#333' }}>Selamat Datang!</h2>
-          <p style={{ fontSize: '14px', color: '#666', marginBottom: '30px' }}>Silakan masuk untuk mengakses panel BM Kurir.</p>
+          <p style={{ fontSize: '14px', color: '#666', marginBottom: '30px' }}>Silakan masuk untuk accessing panel BM Kurir.</p>
           
           <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <div style={inputGroup}>
@@ -108,7 +144,7 @@ const Login = () => {
 
           <div style={{ margin: '20px 0', textAlign: 'center', color: '#ccc', fontSize: '14px' }}>or</div>
 
-          <button style={googleButtonStyle}>
+          <button type="button" onClick={handleGoogleLogin} style={googleButtonStyle}>
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: '18px', marginRight: '10px' }} />
             Continue with Google
           </button>
@@ -122,6 +158,7 @@ const Login = () => {
   );
 };
 
+// IN-LINE STYLES
 const inputGroup = { display: 'flex', flexDirection: 'column', gap: '5px' };
 const labelStyle = { fontSize: '13px', fontWeight: '600', color: '#666' };
 const inputStyle = { padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', width: '100%', boxSizing: 'border-box', outline: 'none' };

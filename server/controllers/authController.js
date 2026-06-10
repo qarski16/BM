@@ -233,3 +233,17 @@ exports.uploadSimKurir = async (req, res) => {
     res.status(500).json({ success: false, message: "Gagal mengunggah foto SIM!" });
   }
 };
+
+// --- 📊 8. GET ALL KURIR (Untuk Mengisi Tabel Manajemen Kurir & Modal Dropdown Admin) ---
+exports.getSemuaKurir = async (req, res) => {
+  try {
+    // Mencari semua pengguna dengan kriteria role 'kurir' dan menyembunyikan field password demi keamanan
+    const kurirs = await User.find({ role: 'kurir' }).select('-password');
+    
+    // Kembalikan dalam bentuk data Array JSON murni agar mudah di-map frontend
+    res.status(200).json(kurirs);
+  } catch (error) {
+    console.error("Error di Get Semua Kurir Controller:", error.message);
+    res.status(500).json({ success: false, message: "Server error saat mengambil daftar operasional kurir!" });
+  }
+};
