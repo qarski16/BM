@@ -52,4 +52,4 @@ const PesananSchema = new mongoose.Schema({
   timestamps: true 
 });
 
-module.exports = mongoose.model('Pesanan', PesananSchema);
+module.exports = mongoose.models.Pesanan || mongoose.model('Pesanan', PesananSchema);
