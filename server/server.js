@@ -38,6 +38,21 @@ app.use('/api/pesanan', require('./routes/pesanan'));
 
 
 // =========================================================================
+// 🩺 HEALTH CHECK ENDPOINT (Standar Monitoring Produksi Aplikasi - Week 13)
+// =========================================================================
+// Digunakan oleh platform cloud (seperti Heroku/Render) untuk memantau status runtime web BM Kurir
+app.get('/api/health', (req, res) => {
+    res.status(200).json({
+        status: 'OK',
+        environment: process.env.NODE_ENV || 'development',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        version: process.env.npm_package_version || '1.0.0'
+    });
+});
+
+
+// =========================================================================
 // 🔄 PENYESUAIAN RUTE UPDATE PESANAN (MENDUKUNG ID KURIR STRING "BM001")
 // =========================================================================
 app.put('/api/pesanan/update/:id', async (req, res) => {
@@ -97,5 +112,5 @@ if (process.env.NODE_ENV !== 'test') {
     });
 }
 
-// 🎯 SELESAI & WAJIB: Export instance 'app' agar bisa dieksekusi dari file pengujian Jest/Supertest
+// 🎯 Export instance 'app' agar bisa di-import oleh skrip automation testing maupun runner lainnya
 module.exports = app;
