@@ -10,12 +10,10 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    # Menggunakan Node.js versi 20 sebagai standar stabil terbaru agar proses testing lebih cepat
     strategy:
       matrix:
         node-version: [20.x]
 
-    # Menyediakan database MongoDB virtual di dalam server GitHub untuk keperluan testing API
     services:
       mongodb:
         image: mongo:6.0
@@ -37,7 +35,7 @@ jobs:
           npm ci
         else
           npm install
-        </xif>
+        fi
       working-directory: ./server
 
     - name: 4. Jalankan Skrip Otomasi Pengujian (Jest) di folder Server
