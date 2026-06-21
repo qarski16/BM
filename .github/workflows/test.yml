@@ -30,12 +30,7 @@ jobs:
         node-version: ${{ matrix.node-version }}
 
     - name: 3. Install Dependensi Node di folder Server
-      run: |
-        if [ -f package-lock.json ]; then
-          npm ci
-        else
-          npm install
-        fi
+      run: npm install
       working-directory: ./server
 
     - name: 4. Jalankan Skrip Otomasi Pengujian (Jest) di folder Server
