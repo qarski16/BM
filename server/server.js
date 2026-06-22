@@ -11,35 +11,64 @@ const connectDB = require('./config/db');
 const app = express();
 
 // =========================================================================
-// 🗄️ STRATEGI PEMISAHAN DATABASE UTAMA, PROD (ATLAS), VS TESTING
+// 🌐 KONFIGURASI CORS EKSPLISIT UNTUK PROD & DEV
 // =========================================================================
-if (process.env.NODE_ENV === 'test') {
-    // Jika sedang dalam mode testing, bypass connectDB() bawaan dan arahkan ke database test khusus
-    const dbTestURI = process.env.MONGO_URI_TEST || 'mongodb://127.0.0.1:27017/bm_kurir_testing';
-    
-    // Menggunakan opsi standard Mongoose untuk menjaga stabilitas koneksi internal Jest
-    mongoose.connect(dbTestURI)
-      .then(() => {
-          // Log dimatikan agar output terminal 'npm test' bersih dari teks log database
-      })
-      .catch(err => console.error('Gagal koneksi database testing:', err.message));
-} else {
-    // MODIFIKASI: Deteksi otomatis apakah berjalan di server production (Vercel/Render/Railway)
-    // Jika NODE_ENV bernilai 'production', gunakan MONGO_URI_PROD dari file .env Anda
-    if (process.env.NODE_ENV === 'production') {
-        const prodURI = process.env.MONGO_URI_PROD;
-        mongoose.connect(prodURI)
-          .then(() => console.log('✅ MongoDB Atlas (Production) Terkoneksi Sukses!'))
-          .catch(err => console.error('❌ Gagal Connect ke MongoDB Atlas:', err.message));
-    } else {
-        // Jika di laptop sendiri (development), panggil fungsi connectDB() bawaan Anda yang mengarah ke lokal
-        connectDB();
+app.use(cors({
+    origin: '*', // Mengizinkan semua origin agar komunikasi antar-cloud Vercel lancar
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+app.use(express.json()); 
+
+// =========================================================================
+// 🗄️ MANAJEMEN KONEKSI DATABASE (OPTIMAL UNTUK VERCEL SERVERLESS)
+// =========================================================================
+// Global variable untuk menyimpan status koneksi agar tidak melakukan connect berulang-ulang di Vercel
+let isConnected = false;
+
+const hubungkanDatabaseProduksi = async () => {
+    if (isConnected) {
+        return;
     }
+    try {
+        const prodURI = process.env.MONGO_URI_PROD || process.env.MONGO_URI;
+        if (!prodURI) {
+            console.error('❌ Error: MONGO_URI_PROD tidak ditemukan di Environment Variables!');
+            return;
+        }
+        
+        // Membuka koneksi dengan toleransi timeout tinggi untuk serverless cloud
+        const db = await mongoose.connect(prodURI, {
+            serverSelectionTimeoutMS: 5000 
+        });
+        
+        isConnected = db.connections[0].readyState;
+        console.log('✅ MongoDB Atlas (Production) Terkoneksi Sukses!');
+    } catch (err) {
+        console.error('❌ Gagal Connect ke MongoDB Atlas:', err.message);
+    }
+};
+
+// Eksekusi pengondisian environment
+if (process.env.NODE_ENV === 'test') {
+    const dbTestURI = process.env.MONGO_URI_TEST || 'mongodb://127.0.0.1:27017/bm_kurir_testing';
+    mongoose.connect(dbTestURI).catch(() => {});
+} else if (process.env.NODE_ENV === 'production') {
+    // Di Vercel, kita panggil secara asinkronus di lapis atas
+    hubungkanDatabaseProduksi();
+} else {
+    // Mode lokal/development
+    connectDB();
 }
 
-// Middleware dasar
-app.use(cors());
-app.use(express.json()); 
+// Middleware tambahan untuk menjamin database selalu siap sebelum rute diproses (Khusus Vercel)
+app.use(async (req, res, next) => {
+    if (process.env.NODE_ENV === 'production' && !isConnected) {
+        await hubungkanDatabaseProduksi();
+    }
+    next();
+});
 
 // --- 🌐 REGISTRASI RUTE API UTAMA ---
 app.use('/api/auth', require('./routes/auth'));
@@ -47,16 +76,15 @@ app.use('/api/pesanan', require('./routes/pesanan'));
 
 
 // =========================================================================
-// 🩺 HEALTH CHECK ENDPOINT (Standar Monitoring Produksi Aplikasi - Week 13)
+// 🩺 HEALTH CHECK ENDPOINT
 // =========================================================================
-// Digunakan oleh platform cloud (seperti Heroku/Render) untuk memantau status runtime web BM Kurir
 app.get('/api/health', (req, res) => {
     res.status(200).json({
         status: 'OK',
+        database: mongoose.connection.readyState === 1 ? 'CONNECTED' : 'DISCONNECTED',
         environment: process.env.NODE_ENV || 'development',
         timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        version: process.env.npm_package_version || '1.0.0'
+        uptime: process.uptime()
     });
 });
 
@@ -74,7 +102,6 @@ app.put('/api/pesanan/update/:id', async (req, res) => {
         }
 
         const db = mongoose.connection.db;
-        
         const collections = await db.listCollections().toArray();
         const collectionName = collections.find(c => c.name === 'pesanans' || c.name === 'orders' || c.name === 'pesanan')?.name || 'pesanans';
 
@@ -111,9 +138,8 @@ app.get('/', (req, res) => {
 });
 
 // =========================================================================
-// 🚀 PENGONDISIAN LISTEN PORT (PENTING AGAR TIDAK SALING MENGUNCI PORT DENGAN JEST)
+// 🚀 PENGONDISIAN LISTEN PORT
 // =========================================================================
-// Hanya jalankan server listen JIKA tidak sedang menjalankan pengujian (bukan mode test)
 if (process.env.NODE_ENV !== 'test') {
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {
@@ -121,5 +147,4 @@ if (process.env.NODE_ENV !== 'test') {
     });
 }
 
-// 🎯 Export instance 'app' agar bisa di-import oleh skrip automation testing maupun runner lainnya
 module.exports = app;
