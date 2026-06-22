@@ -33,7 +33,15 @@ const UserSchema = new mongoose.Schema({
   statusOnline: {
     type: String,
     enum: ['Online', 'Offline', 'Mengantar'],
-    default: 'Offline'
+    default: 'Offline',
+    
+    // 🛠️ FUNGSI SAKTI: Otomatis mengubah teks sebelum disimpan ke database
+    set: function(nilaiBaru) {
+      if (!nilaiBaru) return nilaiBaru;
+      // Mengubah huruf pertama menjadi Kapital, sisanya huruf kecil
+      // Contoh: "online" -> "Online", "OFFLINE" -> "Offline"
+      return nilaiBaru.charAt(0).toUpperCase() + nilaiBaru.slice(1).toLowerCase();
+    }
   },
   tanggalDibuat: {
     type: Date,
