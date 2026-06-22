@@ -5,20 +5,26 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose'); 
 const passport = require('passport'); 
 const GoogleStrategy = require('passport-google-oauth20').Strategy; 
+
+// =========================================================================
+// ⚠️ PERBAIKAN HURUF BESAR/KECIL: Sesuaikan dengan nama file asli Anda jika menggunakan huruf kecil (contoh: './models/user')
+// =========================================================================
 const User = require('../models/User');
-// ⭐ BARU: Import model Pesanan agar bisa menghitung akumulasi komisi kurir
 const Pesanan = require('../models/Pesanan'); 
 
 // DAFTAR GMAIL SPESIFIK YANG DIIZINKAN MENJADI ADMIN UTAMA
 const GMAIL_ADMIN = ['admin@bmkurir.com']; 
 
 // =========================================================================
-// 🌐 FIX FIXED: KREDENSIAL STATIS STRATEGI GOOGLE OAUTH 2.0
+// 🌐 STRATEGI GOOGLE OAUTH 2.0 (DIBUAT DINAMIS UNTUK LOCAL & PRODUCTION VERCEL)
 // =========================================================================
 passport.use(new GoogleStrategy({
     clientID: "994702628214-ot1pb27i271spmvidectvjgle7lqtmhs.apps.googleusercontent.com",
     clientSecret: "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", 
-    callbackURL: "http://localhost:5000/api/auth/google/callback"
+    // Menggunakan variabel environment Vercel jika ada, jika tidak ada kembali ke localhost
+    callbackURL: process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}/api/auth/google/callback` 
+      : "http://localhost:5000/api/auth/google/callback"
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
@@ -95,7 +101,10 @@ router.get('/google/callback',
       { expiresIn: '24h' },
       (err, token) => {
         if (err) return res.redirect('http://localhost:5173/login?error=jwt_error');
-        res.redirect(`http://localhost:5173/login?token=${token}&id=${req.user._id}&nama=${encodeURIComponent(req.user.namaLengkap)}&role=${req.user.role}`);
+        
+        // Mengarahkan ke domain frontend (bisa localhost atau domain production)
+        const frontendURL = process.env.NODE_ENV === 'production' ? 'https://bm-kurir.vercel.app' : 'http://localhost:5173';
+        res.redirect(`${frontendURL}/login?token=${token}&id=${req.user._id}&nama=${encodeURIComponent(req.user.namaLengkap)}&role=${req.user.role}`);
       }
     );
   }
@@ -236,17 +245,14 @@ router.post('/login', async (req, res) => {
 });
 
 // =========================================================================
-// ⭐ 3. READ: Ambil Semua Kurir + HITUNG KOMISI 2% OTOMATIS (DIPERBARUI)
+// 3. READ: Ambil Semua Kurir + HITUNG KOMISI 2% OTOMATIS
 // =========================================================================
 router.get('/semua-kurir', async (req, res) => {
   try {
-    // Ambil data kurir menggunakan .lean() agar properti komisi bisa disuntikkan dengan mudah
     const kurirs = await User.find({ role: 'kurir' }).select('-password').lean();
 
-    // Lakukan pemetaan data silang dengan koleksi Pesanan secara paralel
     const kurirDenganKomisi = await Promise.all(
       kurirs.map(async (kurir) => {
-        // Buat kriteria fleksibel: mencocokkan string ID kustom (BM001), namaLengkap, maupun email
         let kriteriaPencarian = [
           { kurirId: kurir._id.toString() },
           { kurirId: kurir.namaLengkap }
@@ -256,18 +262,16 @@ router.get('/semua-kurir', async (req, res) => {
           kriteriaPencarian.push({ kurirId: kurir.email });
         }
 
-        // Hitung total pengantaran kurir tersebut yang berstatus 'Selesai'
         const jumlahSelesai = await Pesanan.countDocuments({
           status: { $regex: /^selesai$/i },
           $or: kriteriaPencarian
         });
 
-        // 🎯 Rumus: 1 kali pengantaran selesai = komisi bertambah 2%
         const totalKomisi = jumlahSelesai * 2;
 
         return {
           ...kurir,
-          komisiSistem: totalKomisi // Variabel dinamis untuk dibaca Frontend
+          komisiSistem: totalKomisi 
         };
       })
     );
