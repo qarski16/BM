@@ -16,7 +16,7 @@ const app = express();
 app.use(cors({
     origin: '*', // Mengizinkan semua origin agar komunikasi antar-cloud Vercel lancar
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token']
 }));
 
 app.use(express.json()); 
@@ -37,7 +37,6 @@ const hubungkanDatabaseProduksi = async () => {
         }
         
         console.log('⏳ Mencoba menyambungkan ke MongoDB Atlas...');
-        // Membuka koneksi dengan toleransi timeout tinggi untuk serverless cloud
         await mongoose.connect(prodURI, {
             serverSelectionTimeoutMS: 5000 
         });
@@ -52,8 +51,8 @@ const hubungkanDatabaseProduksi = async () => {
 if (process.env.NODE_ENV === 'test') {
     const dbTestURI = process.env.MONGO_URI_TEST || 'mongodb://127.0.0.1:27017/bm_kurir_testing';
     mongoose.connect(dbTestURI).catch(() => {});
-} else if (process.env.NODE_ENV === 'production') {
-    // Biarkan dipanggil pertama kali, jika lambat akan ditangani oleh middleware di bawah
+} else if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+    // Jalankan koneksi produksi jika berada di Vercel lingkungan live
     hubungkanDatabaseProduksi().catch(() => {});
 } else {
     // Mode lokal/development
@@ -62,7 +61,7 @@ if (process.env.NODE_ENV === 'test') {
 
 // Middleware tambahan untuk menjamin database selalu siap sebelum rute diproses (Khusus Vercel)
 app.use(async (req, res, next) => {
-    if (process.env.NODE_ENV === 'production' && mongoose.connection.readyState !== 1) {
+    if ((process.env.NODE_ENV === 'production' || process.env.VERCEL) && mongoose.connection.readyState !== 1) {
         await hubungkanDatabaseProduksi();
     }
     next();
@@ -136,13 +135,14 @@ app.get('/', (req, res) => {
 });
 
 // =========================================================================
-// 🚀 PENGONDISIAN LISTEN PORT
+// 🚀 PENGONDISIAN LISTEN PORT (HANYA BERJALAN JIKA BUKAN DI VERCEL LIVE)
 // =========================================================================
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {
         console.log(`Server jalan di port ${PORT}`);
     });
 }
 
+// ⚠️ WAJIB DI EKSPORES: Agar Vercel Serverless Functions dapat mengenali app express ini
 module.exports = app;
