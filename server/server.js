@@ -24,11 +24,9 @@ app.use(express.json());
 // =========================================================================
 // 🗄️ MANAJEMEN KONEKSI DATABASE (OPTIMAL UNTUK VERCEL SERVERLESS)
 // =========================================================================
-// Global variable untuk menyimpan status koneksi agar tidak melakukan connect berulang-ulang di Vercel
-let isConnected = false;
-
 const hubungkanDatabaseProduksi = async () => {
-    if (isConnected) {
+    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+    if (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2) {
         return;
     }
     try {
@@ -38,25 +36,25 @@ const hubungkanDatabaseProduksi = async () => {
             return;
         }
         
+        console.log('⏳ Mencoba menyambungkan ke MongoDB Atlas...');
         // Membuka koneksi dengan toleransi timeout tinggi untuk serverless cloud
-        const db = await mongoose.connect(prodURI, {
+        await mongoose.connect(prodURI, {
             serverSelectionTimeoutMS: 5000 
         });
         
-        isConnected = db.connections[0].readyState;
         console.log('✅ MongoDB Atlas (Production) Terkoneksi Sukses!');
     } catch (err) {
         console.error('❌ Gagal Connect ke MongoDB Atlas:', err.message);
     }
 };
 
-// Eksekusi pengondisian environment
+// Eksekusi pengondisian environment awal
 if (process.env.NODE_ENV === 'test') {
     const dbTestURI = process.env.MONGO_URI_TEST || 'mongodb://127.0.0.1:27017/bm_kurir_testing';
     mongoose.connect(dbTestURI).catch(() => {});
 } else if (process.env.NODE_ENV === 'production') {
-    // Di Vercel, kita panggil secara asinkronus di lapis atas
-    hubungkanDatabaseProduksi();
+    // Biarkan dipanggil pertama kali, jika lambat akan ditangani oleh middleware di bawah
+    hubungkanDatabaseProduksi().catch(() => {});
 } else {
     // Mode lokal/development
     connectDB();
@@ -64,7 +62,7 @@ if (process.env.NODE_ENV === 'test') {
 
 // Middleware tambahan untuk menjamin database selalu siap sebelum rute diproses (Khusus Vercel)
 app.use(async (req, res, next) => {
-    if (process.env.NODE_ENV === 'production' && !isConnected) {
+    if (process.env.NODE_ENV === 'production' && mongoose.connection.readyState !== 1) {
         await hubungkanDatabaseProduksi();
     }
     next();
