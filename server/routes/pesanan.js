@@ -162,14 +162,15 @@ router.get('/admin/manajemen-kurir', async (req, res) => {
         if (kurir.email) {
           kriteriaPencarian.push({ kurirId: kurir.email });
         }
+        if (kurir.kurirId) {
+          kriteriaPencarian.push({ kurirId: kurir.kurirId });
+        }
 
-        // Hitung pengantaran yang berstatus 'Selesai' untuk kurir ini
         const jumlahSelesai = await Pesanan.countDocuments({
           status: { $regex: /^selesai$/i },
           $or: kriteriaPencarian
         });
 
-        // Rumus komisi: 1 pengantaran selesai = 2%
         const persentaseKomisi = jumlahSelesai * 2;
 
         return {
@@ -248,9 +249,6 @@ router.put('/update-status/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Pesanan tidak ditemukan' });
     }
 
-    console.log(`Hasil       : Sukses diperbarui ke MongoDB.`);
-    console.log(`-----------------------------------\n`);
-
     res.status(200).json({ 
       success: true,
       message: 'Status pesanan berhasil diperbarui!', 
@@ -320,18 +318,22 @@ router.get('/kurir/aktif/:kurirId', async (req, res) => {
     const { kurirId } = req.params;
     let kriteriaPencarian = [{ kurirId: kurirId }];
 
-    const dataUser = await User.findOne({ 
-      $or: [{ _id: kurirId }, { kurirId: kurirId }, { namaLengkap: kurirId }] 
-    });
-
-    if (dataUser) {
-      if (dataUser._id) kriteriaPencarian.push({ kurirId: dataUser._id });
-      if (dataUser.kurirId) kriteriaPencarian.push({ kurirId: dataUser.kurirId });
-      if (dataUser.namaLengkap) kriteriaPencarian.push({ kurirId: dataUser.namaLengkap });
-    }
+    const queryUser = [
+      { kurirId: kurirId },
+      { namaLengkap: kurirId }
+    ];
 
     if (mongoose.Types.ObjectId.isValid(kurirId)) {
+      queryUser.push({ _id: new mongoose.Types.ObjectId(kurirId) });
       kriteriaPencarian.push({ kurirId: new mongoose.Types.ObjectId(kurirId) });
+    }
+
+    const dataUser = await User.findOne({ $or: queryUser });
+
+    if (dataUser) {
+      if (dataUser._id) kriteriaPencarian.push({ kurirId: dataUser._id.toString() });
+      if (dataUser.kurirId) kriteriaPencarian.push({ kurirId: dataUser.kurirId });
+      if (dataUser.namaLengkap) kriteriaPencarian.push({ kurirId: dataUser.namaLengkap });
     }
 
     const tugasAktif = await Pesanan.find({ 
@@ -347,7 +349,7 @@ router.get('/kurir/aktif/:kurirId', async (req, res) => {
 });
 
 // =========================================================================
-// 9. READ: AMBIL RIWAYAT TUGAS KURIR (DIPERBAIKI AGAR SINKRON DENGAN STRING/OBJECTID)
+// 9. READ: AMBIL RIWAYAT TUGAS KURIR (PERBAIKAN TOTAL AMAN DARI NULL CAST ERROR)
 // =========================================================================
 router.get('/kurir/riwayat/:kurirId', async (req, res) => {
   try {
@@ -358,21 +360,28 @@ router.get('/kurir/riwayat/:kurirId', async (req, res) => {
       { kurirId: { $regex: new RegExp(kurirId, "i") } }
     ];
 
-    const dataUser = await User.findOne({ 
-      $or: [
-        { _id: mongoose.Types.ObjectId.isValid(kurirId) ? new mongoose.Types.ObjectId(kurirId) : null }, 
-        { namaLengkap: { $regex: new RegExp(kurirId, "i") } }
-      ]
-    });
+    const queryUser = [
+      { kurirId: kurirId },
+      { namaLengkap: { $regex: new RegExp(kurirId, "i") } }
+    ];
+
+    if (mongoose.Types.ObjectId.isValid(kurirId)) {
+      queryUser.push({ _id: new mongoose.Types.ObjectId(kurirId) });
+      kriteriaPencarian.push({ kurirId: new mongoose.Types.ObjectId(kurirId) });
+    }
+
+    const dataUser = await User.findOne({ $or: queryUser });
 
     if (dataUser) {
       kriteriaPencarian.push({ kurirId: dataUser._id.toString() });
-      kriteriaPencarian.push({ kurirId: dataUser.namaLengkap });
+      if (dataUser.kurirId) kriteriaPencarian.push({ kurirId: dataUser.kurirId });
+      if (dataUser.namaLengkap) kriteriaPencarian.push({ kurirId: dataUser.namaLengkap });
     }
 
+    // Mengambil pesanan yang berstatus 'Selesai' secara aman
     const riwayatPesanan = await Pesanan.find({ 
       status: { $regex: /^selesai$/i }, 
-      $or: kriteriaPencarian.filter(k => k.kurirId != null) 
+      $or: kriteriaPencarian
     }).sort({ createdAt: -1 });
     
     res.json(riwayatPesanan);
@@ -383,7 +392,7 @@ router.get('/kurir/riwayat/:kurirId', async (req, res) => {
 });
 
 // =========================================================================
-// ⭐ 10. READ: KOTAK SUMMARY HITUNG RATA-RATA RATING & KOMISI DINAMIS (UPDATED)
+// ⭐ 10. READ: KOTAK SUMMARY HITUNG RATA-RATA RATING & KOMISI DINAMIS
 // =========================================================================
 router.get('/kurir/summary-performa/:kurirId', async (req, res) => {
   try {
@@ -394,19 +403,25 @@ router.get('/kurir/summary-performa/:kurirId', async (req, res) => {
       { kurirId: { $regex: new RegExp(kurirId, "i") } }
     ];
 
-    const dataUser = await User.findOne({ 
-      $or: [
-        { _id: mongoose.Types.ObjectId.isValid(kurirId) ? new mongoose.Types.ObjectId(kurirId) : null }, 
-        { namaLengkap: { $regex: new RegExp(kurirId, "i") } }
-      ]
-    });
+    const queryUser = [
+      { kurirId: kurirId },
+      { namaLengkap: { $regex: new RegExp(kurirId, "i") } }
+    ];
+
+    if (mongoose.Types.ObjectId.isValid(kurirId)) {
+      queryUser.push({ _id: new mongoose.Types.ObjectId(kurirId) });
+      kriteriaPencarian.push({ kurirId: new mongoose.Types.ObjectId(kurirId) });
+    }
+
+    const dataUser = await User.findOne({ $or: queryUser });
 
     if (dataUser) {
       kriteriaPencarian.push({ kurirId: dataUser._id.toString() });
-      kriteriaPencarian.push({ kurirId: dataUser.namaLengkap });
+      if (dataUser.kurirId) kriteriaPencarian.push({ kurirId: dataUser.kurirId });
+      if (dataUser.namaLengkap) kriteriaPencarian.push({ kurirId: dataUser.namaLengkap });
     }
 
-    const kueriFinal = { $or: kriteriaPencarian.filter(k => k.kurirId != null) };
+    const kueriFinal = { $or: kriteriaPencarian };
 
     const totalPengantaran = await Pesanan.countDocuments(kueriFinal);
     const selesai = await Pesanan.countDocuments({ status: { $regex: /^selesai$/i }, ...kueriFinal });
@@ -415,7 +430,6 @@ router.get('/kurir/summary-performa/:kurirId', async (req, res) => {
       ...kueriFinal 
     });
 
-    // 🎯 Kalkulasi persentase komisi kurir saat ini (1 pengantaran selesai = 2%)
     const totalKomisiPersen = selesai * 2;
 
     const pesananBerating = await Pesanan.find({ 
@@ -435,7 +449,7 @@ router.get('/kurir/summary-performa/:kurirId', async (req, res) => {
       selesai,
       dalamProses,
       rating: rataRataRating,
-      komisiSistem: totalKomisiPersen // 👈 Properti baru untuk dibaca dashboard kurir
+      komisiSistem: totalKomisiPersen
     });
 
   } catch (err) {
