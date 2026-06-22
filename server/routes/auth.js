@@ -6,9 +6,6 @@ const mongoose = require('mongoose');
 const passport = require('passport'); 
 const GoogleStrategy = require('passport-google-oauth20').Strategy; 
 
-// =========================================================================
-// ⚠️ PERBAIKAN HURUF BESAR/KECIL: Sesuaikan dengan nama file asli Anda jika menggunakan huruf kecil (contoh: './models/user')
-// =========================================================================
 const User = require('../models/User');
 const Pesanan = require('../models/Pesanan'); 
 
@@ -16,15 +13,13 @@ const Pesanan = require('../models/Pesanan');
 const GMAIL_ADMIN = ['admin@bmkurir.com']; 
 
 // =========================================================================
-// 🌐 STRATEGI GOOGLE OAUTH 2.0 (DIBUAT DINAMIS UNTUK LOCAL & PRODUCTION VERCEL)
+// 🌐 STRATEGI GOOGLE OAUTH 2.0 (PERBAIKAN: DINAMIS MENGGUNAKAN ENV VARIABLE)
 // =========================================================================
 passport.use(new GoogleStrategy({
     clientID: "994702628214-ot1pb27i271spmvidectvjgle7lqtmhs.apps.googleusercontent.com",
     clientSecret: "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", 
-    // Menggunakan variabel environment Vercel jika ada, jika tidak ada kembali ke localhost
-    callbackURL: process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}/api/auth/google/callback` 
-      : "http://localhost:5000/api/auth/google/callback"
+    // Menggunakan variabel GOOGLE_CALLBACK_URL yang kita atur di Vercel env
+    callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:5000/api/auth/google/callback"
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
@@ -86,7 +81,14 @@ passport.use(new GoogleStrategy({
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 router.get('/google/callback', 
-  passport.authenticate('google', { session: false, failureRedirect: 'http://localhost:5173/login?error=google_failed' }),
+  // PERBAIKAN: Redirect gagal diarahkan secara dinamis menggunakan variabel FRONTEND_URL
+  (req, res, next) => {
+    const loginGagalURL = process.env.FRONTEND_URL || 'http://localhost:5173';
+    passport.authenticate('google', { 
+      session: false, 
+      failureRedirect: `${loginGagalURL}/login?error=google_failed` 
+    })(req, res, next);
+  },
   (req, res) => {
     const payload = {
       user: {
@@ -100,10 +102,10 @@ router.get('/google/callback',
       process.env.JWT_SECRET || 'rahasia_kurir_123',
       { expiresIn: '24h' },
       (err, token) => {
-        if (err) return res.redirect('http://localhost:5173/login?error=jwt_error');
+        const frontendURL = process.env.FRONTEND_URL || 'http://localhost:5173';
+        if (err) return res.redirect(`${frontendURL}/login?error=jwt_error`);
         
-        // Mengarahkan ke domain frontend (bisa localhost atau domain production)
-        const frontendURL = process.env.NODE_ENV === 'production' ? 'https://bm-kurir.vercel.app' : 'http://localhost:5173';
+        // Mengarahkan ke alamat frontend yang aktif dengan membawa token login
         res.redirect(`${frontendURL}/login?token=${token}&id=${req.user._id}&nama=${encodeURIComponent(req.user.namaLengkap)}&role=${req.user.role}`);
       }
     );
