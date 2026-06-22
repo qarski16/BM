@@ -162,9 +162,6 @@ router.get('/admin/manajemen-kurir', async (req, res) => {
         if (kurir.email) {
           kriteriaPencarian.push({ kurirId: kurir.email });
         }
-        if (kurir.kurirId) {
-          kriteriaPencarian.push({ kurirId: kurir.kurirId });
-        }
 
         const jumlahSelesai = await Pesanan.countDocuments({
           status: { $regex: /^selesai$/i },
@@ -249,6 +246,9 @@ router.put('/update-status/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Pesanan tidak ditemukan' });
     }
 
+    console.log(`Hasil       : Sukses diperbarui ke MongoDB.`);
+    console.log(`-----------------------------------\n`);
+
     res.status(200).json({ 
       success: true,
       message: 'Status pesanan berhasil diperbarui!', 
@@ -311,29 +311,25 @@ router.delete('/hapus/:id', auth, async (req, res) => {
 });
 
 // =========================================================================
-// 8. READ: Ambil Tugas Aktif Kurir
+// 8. READ: Ambil Tugas Aktif Kurir (LOGIKA ASLI ANDA YANG BERHASIL)
 // =========================================================================
 router.get('/kurir/aktif/:kurirId', async (req, res) => {
   try {
     const { kurirId } = req.params;
     let kriteriaPencarian = [{ kurirId: kurirId }];
 
-    const queryUser = [
-      { kurirId: kurirId },
-      { namaLengkap: kurirId }
-    ];
-
-    if (mongoose.Types.ObjectId.isValid(kurirId)) {
-      queryUser.push({ _id: new mongoose.Types.ObjectId(kurirId) });
-      kriteriaPencarian.push({ kurirId: new mongoose.Types.ObjectId(kurirId) });
-    }
-
-    const dataUser = await User.findOne({ $or: queryUser });
+    const dataUser = await User.findOne({ 
+      $or: [{ _id: kurirId }, { kurirId: kurirId }, { namaLengkap: kurirId }] 
+    });
 
     if (dataUser) {
-      if (dataUser._id) kriteriaPencarian.push({ kurirId: dataUser._id.toString() });
+      if (dataUser._id) kriteriaPencarian.push({ kurirId: dataUser._id });
       if (dataUser.kurirId) kriteriaPencarian.push({ kurirId: dataUser.kurirId });
       if (dataUser.namaLengkap) kriteriaPencarian.push({ kurirId: dataUser.namaLengkap });
+    }
+
+    if (mongoose.Types.ObjectId.isValid(kurirId)) {
+      kriteriaPencarian.push({ kurirId: new mongoose.Types.ObjectId(kurirId) });
     }
 
     const tugasAktif = await Pesanan.find({ 
@@ -349,36 +345,29 @@ router.get('/kurir/aktif/:kurirId', async (req, res) => {
 });
 
 // =========================================================================
-// 9. READ: AMBIL RIWAYAT TUGAS KURIR (PERBAIKAN TOTAL AMAN DARI NULL CAST ERROR)
+// 9. READ: AMBIL RIWAYAT TUGAS KURIR (DISAMAKAN PERSIS STRUKTURNYA DENGAN RUTE AKTIF)
 // =========================================================================
 router.get('/kurir/riwayat/:kurirId', async (req, res) => {
   try {
     const { kurirId } = req.params;
-    
-    let kriteriaPencarian = [
-      { kurirId: kurirId },
-      { kurirId: { $regex: new RegExp(kurirId, "i") } }
-    ];
+    let kriteriaPencarian = [{ kurirId: kurirId }];
 
-    const queryUser = [
-      { kurirId: kurirId },
-      { namaLengkap: { $regex: new RegExp(kurirId, "i") } }
-    ];
-
-    if (mongoose.Types.ObjectId.isValid(kurirId)) {
-      queryUser.push({ _id: new mongoose.Types.ObjectId(kurirId) });
-      kriteriaPencarian.push({ kurirId: new mongoose.Types.ObjectId(kurirId) });
-    }
-
-    const dataUser = await User.findOne({ $or: queryUser });
+    // Menyalin logika pencarian user dari rute aktif Anda yang sudah terbukti berhasil
+    const dataUser = await User.findOne({ 
+      $or: [{ _id: kurirId }, { kurirId: kurirId }, { namaLengkap: kurirId }] 
+    });
 
     if (dataUser) {
-      kriteriaPencarian.push({ kurirId: dataUser._id.toString() });
+      if (dataUser._id) kriteriaPencarian.push({ kurirId: dataUser._id });
       if (dataUser.kurirId) kriteriaPencarian.push({ kurirId: dataUser.kurirId });
       if (dataUser.namaLengkap) kriteriaPencarian.push({ kurirId: dataUser.namaLengkap });
     }
 
-    // Mengambil pesanan yang berstatus 'Selesai' secara aman
+    if (mongoose.Types.ObjectId.isValid(kurirId)) {
+      kriteriaPencarian.push({ kurirId: new mongoose.Types.ObjectId(kurirId) });
+    }
+
+    // Mengambil pesanan khusus status 'Selesai' menggunakan kriteria pencarian yang sama persis
     const riwayatPesanan = await Pesanan.find({ 
       status: { $regex: /^selesai$/i }, 
       $or: kriteriaPencarian
@@ -397,28 +386,20 @@ router.get('/kurir/riwayat/:kurirId', async (req, res) => {
 router.get('/kurir/summary-performa/:kurirId', async (req, res) => {
   try {
     const { kurirId } = req.params;
-    
-    let kriteriaPencarian = [
-      { kurirId: kurirId },
-      { kurirId: { $regex: new RegExp(kurirId, "i") } }
-    ];
+    let kriteriaPencarian = [{ kurirId: kurirId }];
 
-    const queryUser = [
-      { kurirId: kurirId },
-      { namaLengkap: { $regex: new RegExp(kurirId, "i") } }
-    ];
-
-    if (mongoose.Types.ObjectId.isValid(kurirId)) {
-      queryUser.push({ _id: new mongoose.Types.ObjectId(kurirId) });
-      kriteriaPencarian.push({ kurirId: new mongoose.Types.ObjectId(kurirId) });
-    }
-
-    const dataUser = await User.findOne({ $or: queryUser });
+    const dataUser = await User.findOne({ 
+      $or: [{ _id: kurirId }, { kurirId: kurirId }, { namaLengkap: kurirId }] 
+    });
 
     if (dataUser) {
-      kriteriaPencarian.push({ kurirId: dataUser._id.toString() });
+      if (dataUser._id) kriteriaPencarian.push({ kurirId: dataUser._id });
       if (dataUser.kurirId) kriteriaPencarian.push({ kurirId: dataUser.kurirId });
       if (dataUser.namaLengkap) kriteriaPencarian.push({ kurirId: dataUser.namaLengkap });
+    }
+
+    if (mongoose.Types.ObjectId.isValid(kurirId)) {
+      kriteriaPencarian.push({ kurirId: new mongoose.Types.ObjectId(kurirId) });
     }
 
     const kueriFinal = { $or: kriteriaPencarian };
