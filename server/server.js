@@ -11,7 +11,7 @@ const connectDB = require('./config/db');
 const app = express();
 
 // =========================================================================
-// 🗄️ STRATEGI PEMISAHAN DATABASE UTAMA VS DATABASE TESTING
+// 🗄️ STRATEGI PEMISAHAN DATABASE UTAMA, PROD (ATLAS), VS TESTING
 // =========================================================================
 if (process.env.NODE_ENV === 'test') {
     // Jika sedang dalam mode testing, bypass connectDB() bawaan dan arahkan ke database test khusus
@@ -24,8 +24,17 @@ if (process.env.NODE_ENV === 'test') {
       })
       .catch(err => console.error('Gagal koneksi database testing:', err.message));
 } else {
-    // Jalankan koneksi database produksi/lokal bawaan Anda seperti biasa
-    connectDB();
+    // MODIFIKASI: Deteksi otomatis apakah berjalan di server production (Vercel/Render/Railway)
+    // Jika NODE_ENV bernilai 'production', gunakan MONGO_URI_PROD dari file .env Anda
+    if (process.env.NODE_ENV === 'production') {
+        const prodURI = process.env.MONGO_URI_PROD;
+        mongoose.connect(prodURI)
+          .then(() => console.log('✅ MongoDB Atlas (Production) Terkoneksi Sukses!'))
+          .catch(err => console.error('❌ Gagal Connect ke MongoDB Atlas:', err.message));
+    } else {
+        // Jika di laptop sendiri (development), panggil fungsi connectDB() bawaan Anda yang mengarah ke lokal
+        connectDB();
+    }
 }
 
 // Middleware dasar
