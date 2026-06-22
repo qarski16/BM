@@ -13,12 +13,11 @@ const Pesanan = require('../models/Pesanan');
 const GMAIL_ADMIN = ['admin@bmkurir.com']; 
 
 // =========================================================================
-// 🌐 STRATEGI GOOGLE OAUTH 2.0 (PERBAIKAN: DINAMIS MENGGUNAKAN ENV VARIABLE)
+// 🌐 STRATEGI GOOGLE OAUTH 2.0
 // =========================================================================
 passport.use(new GoogleStrategy({
     clientID: "994702628214-ot1pb27i271spmvidectvjgle7lqtmhs.apps.googleusercontent.com",
     clientSecret: "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", 
-    // Menggunakan variabel GOOGLE_CALLBACK_URL yang kita atur di Vercel env
     callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:5000/api/auth/google/callback"
   },
   async (accessToken, refreshToken, profile, done) => {
@@ -81,7 +80,6 @@ passport.use(new GoogleStrategy({
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 router.get('/google/callback', 
-  // PERBAIKAN: Redirect gagal diarahkan secara dinamis menggunakan variabel FRONTEND_URL
   (req, res, next) => {
     const loginGagalURL = process.env.FRONTEND_URL || 'http://localhost:5173';
     passport.authenticate('google', { 
@@ -105,7 +103,6 @@ router.get('/google/callback',
         const frontendURL = process.env.FRONTEND_URL || 'http://localhost:5173';
         if (err) return res.redirect(`${frontendURL}/login?error=jwt_error`);
         
-        // Mengarahkan ke alamat frontend yang aktif dengan membawa token login
         res.redirect(`${frontendURL}/login?token=${token}&id=${req.user._id}&nama=${encodeURIComponent(req.user.namaLengkap)}&role=${req.user.role}`);
       }
     );
@@ -286,10 +283,27 @@ router.get('/semua-kurir', async (req, res) => {
 });
 
 // =========================================================================
-// 4. UPDATE: Update status operasional kurir secara realtime
+// 4. READ: Ambil Data Profil Spesifik Kurir (Untuk Sinkronisasi Frontend)
+// =========================================================================
+router.get('/kurir/profile/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ msg: 'Kurir tidak ditemukan' });
+    }
+    res.json(user);
+  } catch (err) {
+    console.error("Error Ambil Profil Kurir:", err.message);
+    res.status(500).send('Server Error saat memuat profil kurir');
+  }
+});
+
+// =========================================================================
+// 5. UPDATE: Update status operasional kurir secara realtime (SINKRON FRONTEND)
 // =========================================================================
 router.put('/kurir/update-status/:id', async (req, res) => {
-  const { status } = req.body;
+  // 💡 SINKRONISASI: Menerima 'statusOnline' dari frontend atau fallback ke 'status'
+  const status = req.body.statusOnline || req.body.status;
 
   if (!status || !['Online', 'Offline', 'Mengantar'].includes(status)) {
     return res.status(400).json({ msg: 'Status kerja tidak valid. Harus Online, Offline, atau Mengantar.' });
@@ -310,7 +324,7 @@ router.put('/kurir/update-status/:id', async (req, res) => {
     await user.save();
 
     console.log(`[Database Sync Success] Kurir ${user.namaLengkap} diubah ke: '${status}'`);
-    res.json({ msg: 'Status berhasil disinkronkan ke database', status: user.statusOnline });
+    res.json({ msg: 'Status berhasil disinkronkan ke database', statusOnline: user.statusOnline });
   } catch (err) {
     console.error(`[Database Sync Error Handled]: ${err.message}`);
     if (err.kind === 'ObjectId') {
