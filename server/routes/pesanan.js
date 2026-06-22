@@ -146,7 +146,7 @@ router.get('/laporan-detail', async (req, res) => {
 });
 
 // =========================================================================
-// ⭐ 4b. BARU - READ: Ambil List Kurir + Hitung Komisi 2% untuk Manajemen Admin
+// ⭐ 4b. READ: Ambil List Kurir + Hitung Komisi 2% untuk Manajemen Admin
 // =========================================================================
 router.get('/admin/manajemen-kurir', async (req, res) => {
   try {
@@ -308,20 +308,19 @@ router.delete('/hapus/:id', auth, async (req, res) => {
 });
 
 // =========================================================================
-// 8. READ: Ambil Tugas Aktif Kurir
+// 8. READ: Ambil Tugas Aktif Kurir (Khusus Muncul di Dashboard Utama)
 // =========================================================================
 router.get('/kurir/aktif/:kurirId', async (req, res) => {
   try {
     const { kurirId } = req.params;
     let kriteriaPencarian = [{ kurirId: kurirId }];
 
-    // Cari dokumen user pendukung berdasarkan ID bawaan, kustom, atau nama lengkap
     const queryUser = [];
     if (mongoose.Types.ObjectId.isValid(kurirId)) {
       queryUser.push({ _id: new mongoose.Types.ObjectId(kurirId) });
     }
     queryUser.push({ kurirId: kurirId });
-    queryUser.push({ namaLengkap: kurirId });
+    queryUser.push({ namaLengkap: { $regex: new RegExp(`^${kurirId}$`, "i") } });
 
     const dataUser = await User.findOne({ $or: queryUser });
 
@@ -335,6 +334,7 @@ router.get('/kurir/aktif/:kurirId', async (req, res) => {
       kriteriaPencarian.push({ kurirId: new mongoose.Types.ObjectId(kurirId) });
     }
 
+    // Mengambil pesanan yang berstatus aktif berjalan saja
     const tugasAktif = await Pesanan.find({ 
       status: { $in: ['Proses', 'Ambil Barang', 'Dalam Perjalanan', 'Sampai Tujuan'] },
       $or: kriteriaPencarian
@@ -343,34 +343,28 @@ router.get('/kurir/aktif/:kurirId', async (req, res) => {
     res.json(tugasAktif);
   } catch (err) {
     console.error("Error Ambil Tugas Aktif:", err.message);
-    res.status(500).json({ message: "Gagal mengambil data tugas." });
+    res.status(500).json({ message: "Gagal mengambil data tugas aktif." });
   }
 });
 
 // =========================================================================
-// 9. READ: AMBIL RIWAYAT TUGAS KURIR (DIOPTIMALKAN SEPERTI PERMINTAAN FRONTEND)
+// 9. READ: Ambil Riwayat Tugas Kurir (Khusus Muncul di Halaman Riwayat)
 // =========================================================================
 router.get('/kurir/riwayat/:kurirId', async (req, res) => {
   try {
     const { kurirId } = req.params;
-    
-    // Inisialisasi kriteria dasar menggunakan string parameter langsung
-    let kriteriaPencarian = [
-      { kurirId: kurirId }
-    ];
+    let kriteriaPencarian = [{ kurirId: kurirId }];
 
-    // Tambahkan pencarian berbasis ObjectId jika valid heksadesimal
     if (mongoose.Types.ObjectId.isValid(kurirId)) {
       kriteriaPencarian.push({ kurirId: new mongoose.Types.ObjectId(kurirId) });
     }
 
-    // Cari profil user pendukung dari koleksi users
     const queryUser = [];
     if (mongoose.Types.ObjectId.isValid(kurirId)) {
       queryUser.push({ _id: new mongoose.Types.ObjectId(kurirId) });
     }
     queryUser.push({ kurirId: kurirId });
-    queryUser.push({ namaLengkap: { $regex: new RegExp(kurirId, "i") } });
+    queryUser.push({ namaLengkap: { $regex: new RegExp(`^${kurirId}$`, "i") } });
 
     const dataUser = await User.findOne({ $or: queryUser });
 
@@ -380,9 +374,9 @@ router.get('/kurir/riwayat/:kurirId', async (req, res) => {
       if (dataUser.namaLengkap) kriteriaPencarian.push({ kurirId: dataUser.namaLengkap });
     }
 
-    // 🔥 BUGFIX UTAMA: Frontend meminta data riwayat yang mencakup "Selesai" maupun "Proses"
-    // Kita hilangkan batasan kaku agar seluruh pesanan kurir ini ditarik dan difilter dinamis oleh frontend Anda
+    // Mengunci riwayat khusus untuk pesanan yang telah 'Selesai' agar tidak bertabrakan dengan dashboard aktif
     const riwayatPesanan = await Pesanan.find({ 
+      status: { $regex: /^selesai$/i },
       $or: kriteriaPencarian 
     }).sort({ createdAt: -1 });
     
@@ -394,7 +388,7 @@ router.get('/kurir/riwayat/:kurirId', async (req, res) => {
 });
 
 // =========================================================================
-// ⭐ 10. READ: KOTAK SUMMARY HITUNG RATA-RATA RATING & KOMISI DINAMIS
+// ⭐ 10. READ: Kotak Summary Performa Kurir (Hitung Rating & Komisi Dinamis)
 // =========================================================================
 router.get('/kurir/summary-performa/:kurirId', async (req, res) => {
   try {
