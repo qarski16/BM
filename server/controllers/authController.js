@@ -2,7 +2,7 @@ const User = require('../models/user'); // Memanggil Model User dengan skema _id
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// --- 🔑 1. REGISTRASI / DAFTAR AKUN BARU ---
+// --- 🔑 1. REGISTRASI / DAFTAR AKUN BARU (DENGAN ID OTOMATIS BM001 / ADM001) ---
 exports.register = async (req, res) => {
   try {
     const { namaLengkap, email, password, role } = req.body;
@@ -21,7 +21,7 @@ exports.register = async (req, res) => {
       return res.status(400).json({ success: false, message: "Email sudah terdaftar!" });
     }
 
-    // 🔢 LOGIKA PEMBUATAN ID KUSTOM (BM001 / ADM001)
+    // 🔢 LOGIKA PEMBUATAN ID KUSTOM BERURUTAN (BM001 / ADM001)
     let customId = '';
     if (userRole === 'kurir') {
       const totalKurir = await User.countDocuments({ role: 'kurir' });
@@ -131,24 +131,36 @@ exports.getProfilKurir = async (req, res) => {
   }
 };
 
-// --- 🔄 4. UPDATE STATUS OPERASIONAL KURIR ---
+// --- 🔄 4. UPDATE STATUS OPERASIONAL KURIR (SINKRON DENGAN FRONTEND) ---
 exports.updateStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    
+    // 💡 SINKRONISASI: Mengambil nilai baik dikirim sebagai 'statusOnline' atau 'status' dari frontend
+    let statusInput = req.body.statusOnline || req.body.status;
 
-    // 🛠️ PERBAIKAN: Mengganti { new: true } menjadi { returnDocument: 'after' } untuk menghilangkan warning
+    if (!statusInput) {
+      return res.status(400).json({ success: false, message: "Status tidak dikirim atau kosong." });
+    }
+
+    // Menggunakan operator $set agar perubahan string masuk dengan aman dan tervalidasi enum
     const user = await User.findByIdAndUpdate(
       id, 
-      { statusOnline: status }, 
-      { returnDocument: 'after' }
+      { $set: { statusOnline: statusInput } }, 
+      { returnDocument: 'after', runValidators: true } // runValidators memastikan dia dicek ulang oleh Mongoose Schema
     );
 
     if (!user) {
       return res.status(404).json({ success: false, message: "Kurir tidak ditemukan!" });
     }
 
-    res.status(200).json({ success: true, message: "Status berhasil diperbarui!", statusOnline: user.statusOnline });
+    console.log(`[Backend] Status Kurir ${id} otomatis diperbarui di MongoDB menjadi: ${user.statusOnline}`);
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Status berhasil diperbarui!", 
+      statusOnline: user.statusOnline 
+    });
   } catch (error) {
     console.error("Error di Update Status:", error.message);
     res.status(500).json({ success: false, message: "Gagal memperbarui status!" });
@@ -161,7 +173,6 @@ exports.updateProfilKurir = async (req, res) => {
     const { id } = req.params;
     const { namaLengkap, email, telepon } = req.body;
 
-    // 🛠️ PERBAIKAN: Mengganti { new: true } menjadi { returnDocument: 'after' }
     const updatedUser = await User.findByIdAndUpdate(
       id,
       { namaLengkap, email, telepon },
@@ -191,7 +202,7 @@ exports.ubahPasswordKurir = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       id,
       { password: hashedPassword },
-      { returnDocument: 'after' } // 🛠️ Menghilangkan warning terminal
+      { returnDocument: 'after' }
     );
 
     if (!updatedUser) {
@@ -214,13 +225,12 @@ exports.uploadSimKurir = async (req, res) => {
       return res.status(400).json({ success: false, message: "File gambar tidak ditemukan!" });
     }
 
-    // Menyimpan path file gambar/foto SIM yang diunggah ke database
-    const pathFotoSim = req.file.path.replace(/\\/g, "/"); // Menormalkan garis miring path Windows
+    const pathFotoSim = req.file.path.replace(/\\/g, "/"); 
 
     const updatedUser = await User.findByIdAndUpdate(
       id,
       { fotoSim: pathFotoSim },
-      { returnDocument: 'after' } // 🛠️ Menghilangkan warning terminal
+      { returnDocument: 'after' }
     );
 
     if (!updatedUser) {
@@ -234,13 +244,10 @@ exports.uploadSimKurir = async (req, res) => {
   }
 };
 
-// --- 📊 8. GET ALL KURIR (Untuk Mengisi Tabel Manajemen Kurir & Modal Dropdown Admin) ---
+// --- 📊 8. GET ALL KURIR ---
 exports.getSemuaKurir = async (req, res) => {
   try {
-    // Mencari semua pengguna dengan kriteria role 'kurir' dan menyembunyikan field password demi keamanan
     const kurirs = await User.find({ role: 'kurir' }).select('-password');
-    
-    // Kembalikan dalam bentuk data Array JSON murni agar mudah di-map frontend
     res.status(200).json(kurirs);
   } catch (error) {
     console.error("Error di Get Semua Kurir Controller:", error.message);
