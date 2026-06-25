@@ -8,27 +8,52 @@ const mongoose = require('mongoose');
 const auth = require('../middleware/authMiddleware');
 
 // =========================================================================
-// 1. CREATE: Tambah Pesanan Baru (Publik)
+// ✅ PERBAIKAN 1: TAMBAHKAN VALIDASI INPUT PADA CREATE PESANAN
 // =========================================================================
 router.post('/tambah', async (req, res) => {
   const { namaLengkap, noTelpon, alamat, detailPesanan } = req.body;
+  
+  // ✅ TAMBAH: Validasi semua field wajib diisi
+  if (!namaLengkap || !noTelpon || !alamat || !detailPesanan) {
+    return res.status(400).json({ 
+      success: false,
+      message: 'Semua field wajib diisi: namaLengkap, noTelpon, alamat, detailPesanan' 
+    });
+  }
+
+  // ✅ TAMBAH: Validasi format nomor telepon
+  const phoneRegex = /^[0-9]{10,13}$/;
+  if (!phoneRegex.test(noTelpon.replace(/[\s-]/g, ''))) {
+    return res.status(400).json({ 
+      success: false,
+      message: 'Format nomor telepon tidak valid. Gunakan 10-13 digit angka.' 
+    });
+  }
+
   try {
     const pesananBaru = new Pesanan({
-      namaLengkap,
-      noTelpon,
-      alamat,
-      detailPesanan
+      namaLengkap: namaLengkap.trim(),
+      noTelpon: noTelpon.trim(),
+      alamat: alamat.trim(),
+      detailPesanan: detailPesanan.trim()
     });
     const pesanan = await pesananBaru.save();
-    res.status(201).json(pesanan);
+    res.status(201).json({
+      success: true,
+      message: 'Pesanan berhasil dibuat!',
+      data: pesanan
+    });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
+    console.error('Error membuat pesanan:', err.message);
+    res.status(500).json({ 
+      success: false,
+      message: 'Gagal membuat pesanan. Silakan coba lagi.' 
+    });
   }
 });
 
 // =========================================================================
-// 2. READ: Summary Dashboard Utama Admin (Anti-Crash Global & Filter Harian)
+// ✅ PERBAIKAN 2: QUERY ROLE SUDAH BENAR (huruf kecil 'kurir')
 // =========================================================================
 router.get('/summary', async (req, res) => {
   try {
@@ -48,7 +73,8 @@ router.get('/summary', async (req, res) => {
     let statusKurirDinamis = [];
 
     try {
-      countKurir = await User.countDocuments({ role: 'kurir' });
+      // ✅ SUDAH BENAR: role 'kurir' huruf kecil (sesuai database)
+      countKurKurir = await User.countDocuments({ role: 'kurir' });
       const daftarKurirMongoose = await User.find({ role: 'kurir' }).select('namaLengkap statusOnline');
       statusKurirDinamis = daftarKurirMongoose.map(k => ({
         nama: k.namaLengkap,
@@ -118,6 +144,9 @@ router.get('/semua', async (req, res) => {
 // =========================================================================
 router.get('/detail/:id', async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Format ID Pesanan tidak valid' });
+    }
     const pesanan = await Pesanan.findById(req.params.id);
     if (!pesanan) {
       return res.status(404).json({ message: 'Pesanan tidak ditemukan' });
@@ -195,6 +224,10 @@ router.put('/assign/:id', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Kurir ID harus disertakan!' });
     }
 
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Format ID Pesanan tidak valid' });
+    }
+
     const pesananTerupdate = await Pesanan.findByIdAndUpdate(
       req.params.id,
       { 
@@ -261,37 +294,63 @@ router.put('/update-status/:id', auth, async (req, res) => {
 });
 
 // =========================================================================
-// ⭐ 6b. UPDATE: Kirim Rating dan Ulasan dari Pemesan untuk Kurir
+// ✅ PERBAIKAN 3: TAMBAH VALIDASI LENGKAP PADA KIRRIM RATING
 // =========================================================================
 router.put('/kirim-rating/:id', async (req, res) => {
   try {
     const { rating, catatanRating } = req.body;
 
-    if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: "Rating harus bernilai angka 1 sampai 5." });
+    // ✅ TAMBAH: Validasi rating lebih ketat
+    if (!rating || typeof rating !== 'number' || rating < 1 || rating > 5) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Rating harus berupa angka antara 1 sampai 5." 
+      });
+    }
+
+    // ✅ TAMBAH: Cek apakah pesanan sudah ada rating
+    const existingPesanan = await Pesanan.findById(req.params.id);
+    if (!existingPesanan) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Pesanan tidak ditemukan.' 
+      });
+    }
+
+    if (existingPesanan.rating && existingPesanan.rating > 0) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Pesanan ini sudah memiliki rating.' 
+      });
+    }
+
+    if (existingPesanan.status !== 'Selesai') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Hanya pesanan yang sudah selesai yang bisa dirating.' 
+      });
     }
 
     const pesananTerating = await Pesanan.findByIdAndUpdate(
       req.params.id,
       { 
         rating: rating,
-        catatanRating: catatanRating || ""
+        catatanRating: (catatanRating || "").trim()
       },
       { returnDocument: 'after' }
     );
 
-    if (!pesananTerating) {
-      return res.status(404).json({ message: 'Pesanan tidak ditemukan.' });
-    }
-
     res.status(200).json({ 
       success: true, 
-      message: 'Rating pelayanan kurir berhasil disimpan ke cloud database!',
+      message: 'Rating berhasil disimpan!',
       data: pesananTerating 
     });
   } catch (err) {
-    console.error("Error Simpan Rating Pemesan:", err.message);
-    res.status(500).send('Server Error');
+    console.error("Error Simpan Rating:", err.message);
+    res.status(500).json({ 
+      success: false,
+      message: 'Gagal menyimpan rating. Silakan coba lagi.' 
+    });
   }
 });
 
@@ -300,18 +359,25 @@ router.put('/kirim-rating/:id', async (req, res) => {
 // =========================================================================
 router.delete('/hapus/:id', auth, async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Format ID Pesanan tidak valid' });
+    }
     const pesananTerhapus = await Pesanan.findByIdAndDelete(req.params.id);
     if (!pesananTerhapus) {
       return res.status(404).json({ message: 'Pesanan tidak ditemukan' });
     }
     res.status(200).json({ message: 'Pesanan berhasil dihapus dari database cloud!' });
   } catch (err) {
-    res.status(500).send('Server Error');
+    console.error("Error Hapus Pesanan:", err.message);
+    res.status(500).json({ 
+      success: false,
+      message: 'Gagal menghapus pesanan.' 
+    });
   }
 });
 
 // =========================================================================
-// 8. READ: Ambil Tugas Aktif Kurir (LOGIKA ASLI ANDA YANG BERHASIL)
+// 8. READ: Ambil Tugas Aktif Kurir
 // =========================================================================
 router.get('/kurir/aktif/:kurirId', async (req, res) => {
   try {
@@ -322,7 +388,7 @@ router.get('/kurir/aktif/:kurirId', async (req, res) => {
       $or: [{ _id: kurirId }, { kurirId: kurirId }, { namaLengkap: kurirId }] 
     });
 
-    if (dataUser) {
+    if dataUser) {
       if (dataUser._id) kriteriaPencarian.push({ kurirId: dataUser._id });
       if (dataUser.kurirId) kriteriaPencarian.push({ kurirId: dataUser.kurirId });
       if (dataUser.namaLengkap) kriteriaPencarian.push({ kurirId: dataUser.namaLengkap });
@@ -345,14 +411,13 @@ router.get('/kurir/aktif/:kurirId', async (req, res) => {
 });
 
 // =========================================================================
-// 9. READ: AMBIL RIWAYAT TUGAS KURIR (DISAMAKAN PERSIS STRUKTURNYA DENGAN RUTE AKTIF)
+// 9. READ: AMBIL RIWAYAT TUGAS KURIR
 // =========================================================================
 router.get('/kurir/riwayat/:kurirId', async (req, res) => {
   try {
     const { kurirId } = req.params;
     let kriteriaPencarian = [{ kurirId: kurirId }];
 
-    // Menyalin logika pencarian user dari rute aktif Anda yang sudah terbukti berhasil
     const dataUser = await User.findOne({ 
       $or: [{ _id: kurirId }, { kurirId: kurirId }, { namaLengkap: kurirId }] 
     });
@@ -367,7 +432,6 @@ router.get('/kurir/riwayat/:kurirId', async (req, res) => {
       kriteriaPencarian.push({ kurirId: new mongoose.Types.ObjectId(kurirId) });
     }
 
-    // Mengambil pesanan khusus status 'Selesai' menggunakan kriteria pencarian yang sama persis
     const riwayatPesanan = await Pesanan.find({ 
       status: { $regex: /^selesai$/i }, 
       $or: kriteriaPencarian
