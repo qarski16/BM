@@ -1,7 +1,7 @@
 {
   "name": "bm-kurir",
-  "version": "1.0.0",
-  "description": "Project BM Kurir - Backend Server",
+  "version": "1.1.0",
+  "description": "Project BM Kurir - Backend Server (Fixed)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -19,6 +19,9 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^7.1.4",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.1",
     "passport": "^0.7.0",
