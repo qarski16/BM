@@ -388,7 +388,7 @@ router.get('/kurir/aktif/:kurirId', async (req, res) => {
       $or: [{ _id: kurirId }, { kurirId: kurirId }, { namaLengkap: kurirId }] 
     });
 
-    if dataUser) {
+    if (dataUser) {
       if (dataUser._id) kriteriaPencarian.push({ kurirId: dataUser._id });
       if (dataUser.kurirId) kriteriaPencarian.push({ kurirId: dataUser.kurirId });
       if (dataUser.namaLengkap) kriteriaPencarian.push({ kurirId: dataUser.namaLengkap });
