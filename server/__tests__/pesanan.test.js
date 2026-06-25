@@ -133,4 +133,14 @@ describe('==== 🧪 REKAYASA WEB: AUTOMATION TEST SUITE (PESANAN) ====', () => {
         expect([200, 400, 404]).toContain(response.status);
     });
 
+    test('14. GET /api/health - Health Check (Coverage Booster)', async () => {
+        const res = await request(app).get('/api/health');
+        expect(res.status).toBe(200);
+        expect(res.body.status).toBe('OK');
+    });
+
+     test('15. GET / - Root endpoint check', async () => {
+        const res = await request(app).get('/');
+        expect(res.status).toBe(200);
+    });
 });

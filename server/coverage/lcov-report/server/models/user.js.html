@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for server/models/user.js</title>
+    <title>Code coverage report for server/models/User.js</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../../prettify.css" />
     <link rel="stylesheet" href="../../base.css" />
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../index.html">All files</a> / <a href="index.html">server/models</a> user.js</h1>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">server/models</a> User.js</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">85.71% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>6/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">75% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>3/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/0</span>
+                <span class='fraction'>1/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>6/6</span>
             </div>
         
             
@@ -106,7 +106,21 @@
 <a name='L41'></a><a href='#L41'>41</a>
 <a name='L42'></a><a href='#L42'>42</a>
 <a name='L43'></a><a href='#L43'>43</a>
-<a name='L44'></a><a href='#L44'>44</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -135,6 +149,20 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -152,44 +180,58 @@
 <span class="cline-any cline-yes">2x</span></td><td class="text"><pre class="prettyprint lang-js">const mongoose = require('mongoose');
 &nbsp;
 const UserSchema = new mongoose.Schema({
-  // 🛠️ DEFINISI: _id sebagai String kustom untuk menerima teks murni seperti "BM001"
+  // 🛠️ DEFINISI: _id menggunakan String kustom agar mendukung format seperti "BM001"
   _id: {
     type: String,
     required: true
   },
   namaLengkap: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   email: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    lowercase: true,
+    trim: true
   },
+  // 🔓 PERBAIKAN REGISTRASI: 'required' dilepas (false) agar pengguna yang mendaftar 
+  // menggunakan Google Auth / OAuth tidak diblokir atau gagal simpan oleh Mongoose.
   password: {
     type: String,
-    required: true
+    required: false 
   },
   role: {
     type: String,
     enum: ['admin', 'kurir'],
     default: 'kurir'
   },
-  // Properti operasional kurir realtime
+  // Properti operasional kurir realtime (Case-Sensitive ketat)
   statusOnline: {
     type: String,
     enum: ['Online', 'Offline', 'Mengantar'],
-    default: 'Offline'
+    default: 'Offline',
+    
+    // 🛠️ FUNGSI SAKTI: Otomatis mengubah teks sebelum disimpan ke database
+    set: function(nilaiBaru) {
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (!nilaiBaru) <span class="cstat-no" title="statement not covered" >return nilaiBaru;</span>
+      // Mengubah huruf pertama menjadi Kapital, sisanya huruf kecil
+      // Contoh: "online" -&gt; "Online", "OFFLINE" -&gt; "Offline"
+      return nilaiBaru.charAt(0).toUpperCase() + nilaiBaru.slice(1).toLowerCase();
+    }
   },
   tanggalDibuat: {
     type: Date,
     default: Date.now
   }
 }, { 
-  _id: false // 🚫 Beritahu Mongoose untuk tidak membuat Auto-ObjectId bawaan pada schema ini
+  _id: false, // 🚫 Matikan auto-generation ObjectId bawaan MongoDB karena kita pakai String kustom
+  versionKey: false // Menghilangkan field __v bawaan MongoDB agar database lebih bersih
 });
 &nbsp;
-// 🛠️ PERBAIKAN UTAMA: Cegah OverwriteModelError saat server di-restart / auto-reload
+// 🛠️ PERBAIKAN CEGAH OVERWRITE: Memastikan model tidak bentrok saat server auto-reload/restart
 const User = mongoose.models.User || mongoose.model('User', UserSchema);
 &nbsp;
 module.exports = User;</pre></td></tr></table></pre>
@@ -199,7 +241,7 @@ module.exports = User;</pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-14T11:25:03.362Z
+                at 2026-06-25T19:43:38.534Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

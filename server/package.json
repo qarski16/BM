@@ -38,10 +38,11 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "collectCoverageFrom": [
-      "server.js",
-      "models/**/*.js",
-      "!models/Setting.js"
-    ]
+  "collectCoverageFrom": [
+    "server.js",
+    "models/**/*.js",
+    "middleware/**/*.js",
+    "!models/Setting.js"
+  ]
   }
 }

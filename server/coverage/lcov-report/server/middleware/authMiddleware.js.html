@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">18.18% </span>
+                <span class="strong">90.9% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>2/11</span>
+                <span class='fraction'>10/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">83.33% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>5/6</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>1/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">18.18% </span>
+                <span class="strong">90.9% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/11</span>
+                <span class='fraction'>10/11</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -93,48 +93,48 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">const jwt = require('jsonwebtoken');
 &nbsp;
 // Middleware untuk memverifikasi apakah Token JWT valid atau tidak
-module.exports = <span class="fstat-no" title="function not covered" >fu</span>nction (req, res, next) {
+module.exports = function (req, res, next) {
   // 1. Ambil token dari header HTTP request (Format standar: Bearer &lt;token&gt;)
-  const authHeader = <span class="cstat-no" title="statement not covered" >req.header('Authorization');</span>
+  const authHeader = req.header('Authorization');
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  if (!authHeader) {</span>
-<span class="cstat-no" title="statement not covered" >    return res.status(401).json({ msg: 'Token tidak ditemukan, akses ditolak!' });</span>
+  if (!authHeader) {
+    return res.status(401).json({ msg: 'Token tidak ditemukan, akses ditolak!' });
   }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  try {</span>
+  try {
     // 2. Jika token dikirim dengan kata 'Bearer ', kita potong untuk mengambil string tokennya saja
-    const token = <span class="cstat-no" title="statement not covered" >authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;</span>
+    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : <span class="branch-1 cbranch-no" title="branch not covered" >authHeader;</span>
 &nbsp;
     // 3. Verifikasi token menggunakan kunci rahasia JWT yang sama dengan saat login
-    const decoded = <span class="cstat-no" title="statement not covered" >jwt.verify(token, process.env.JWT_SECRET || 'rahasia_kurir_123');</span>
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'rahasia_kurir_123');
 &nbsp;
     // 4. Menyimpan data user yang ter-decode (id &amp; role) ke objek req agar bisa dibaca rute selanjutnya
-<span class="cstat-no" title="statement not covered" >    req.user = decoded.user;</span>
+    req.user = decoded.user;
     
-<span class="cstat-no" title="statement not covered" >    next(); </span>// Lolos pemeriksaan, lanjut ke rute utama!
+    next(); // Lolos pemeriksaan, lanjut ke rute utama!
   } catch (err) {
 <span class="cstat-no" title="statement not covered" >    res.status(401).json({ msg: 'Token tidak valid atau telah kedaluwarsa!' });</span>
   }
@@ -145,7 +145,7 @@ module.exports = <span class="fstat-no" title="function not covered" >fu</span>n
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-13T16:37:40.237Z
+                at 2026-06-25T19:43:38.534Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
