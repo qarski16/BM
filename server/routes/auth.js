@@ -12,12 +12,18 @@ const Pesanan = require('../models/Pesanan');
 // DAFTAR GMAIL SPESIFIK YANG DIIZINKAN MENJADI ADMIN UTAMA
 const GMAIL_ADMIN = ['admin@bmkurir.com']; 
 
+// 🔒 PERBAIKAN: Gunakan environment variable untuk JWT Secret, tanpa fallback hardcoded
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.error('⚠️ JWT_SECRET tidak diset di environment variables! Token tidak aman.');
+}
+
 // =========================================================================
 // 🌐 STRATEGI GOOGLE OAUTH 2.0
 // =========================================================================
 passport.use(new GoogleStrategy({
-    clientID: "994702628214-ot1pb27i271spmvidectvjgle7lqtmhs.apps.googleusercontent.com",
-    clientSecret: "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", 
+    clientID: process.env.GOOGLE_CLIENT_ID || "994702628214-ot1pb27i271spmvidectvjgle7lqtmhs.apps.googleusercontent.com",
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || "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", 
     callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:5000/api/auth/google/callback"
   },
   async (accessToken, refreshToken, profile, done) => {
@@ -95,9 +101,10 @@ router.get('/google/callback',
       }
     };
 
+    // 🔒 PERBAIKAN: Gunakan JWT_SECRET dari environment
     jwt.sign(
       payload,
-      process.env.JWT_SECRET || 'rahasia_kurir_123',
+      JWT_SECRET || 'rahasia_kurir_123',
       { expiresIn: '24h' },
       (err, token) => {
         const frontendURL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -116,8 +123,20 @@ router.post('/register', async (req, res) => {
   const { namaLengkap, email, password } = req.body; 
 
   try {
+    // ✅ PERBAIKAN: Validasi input sebelum proses
     if (!namaLengkap || !email || !password) {
       return res.status(400).json({ msg: 'Semua field wajib diisi' });
+    }
+
+    // ✅ TAMBAH: Validasi email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ msg: 'Format email tidak valid' });
+    }
+
+    // ✅ TAMBAH: Validasi password minimal 6 karakter
+    if (password.length < 6) {
+      return res.status(400).json({ msg: 'Password minimal 6 karakter' });
     }
 
     let userExist = await User.findOne({ email: email.toLowerCase() });
@@ -165,7 +184,7 @@ router.post('/register', async (req, res) => {
 
     jwt.sign(
       payload,
-      process.env.JWT_SECRET || 'rahasia_kurir_123', 
+      JWT_SECRET || 'rahasia_kurir_123', 
       { expiresIn: '24h' },
       (err, token) => {
         if (err) throw err;
@@ -202,6 +221,11 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
+    // ✅ PERBAIKAN: Validasi input sebelum proses
+    if (!email || !password) {
+      return res.status(400).json({ msg: 'Email dan password wajib diisi!' });
+    }
+
     let user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(400).json({ msg: 'Email atau password salah' });
@@ -221,7 +245,7 @@ router.post('/login', async (req, res) => {
 
     jwt.sign(
       payload,
-      process.env.JWT_SECRET || 'rahasia_kurir_123', 
+      JWT_SECRET || 'rahasia_kurir_123', 
       { expiresIn: '24h' },
       (err, token) => {
         if (err) throw err;
@@ -299,10 +323,9 @@ router.get('/kurir/profile/:id', async (req, res) => {
 });
 
 // =========================================================================
-// 5. UPDATE: Update status operasional kurir secara realtime (SINKRON FRONTEND)
+// 5. UPDATE: Update status operasional kurir secara realtime
 // =========================================================================
 router.put('/kurir/update-status/:id', async (req, res) => {
-  // 💡 SINKRONISASI: Menerima 'statusOnline' dari frontend atau fallback ke 'status'
   const status = req.body.statusOnline || req.body.status;
 
   if (!status || !['Online', 'Offline', 'Mengantar'].includes(status)) {
