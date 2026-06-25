@@ -1,9 +1,6 @@
-// =========================================================================
-// ⚠️ WAJIB DI BARIS 1: Load file .env sebelum modul apa pun di-import!
-// =========================================================================
-require('dotenv').config(); 
-
 const express = require('express');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const mongoose = require('mongoose'); 
 const connectDB = require('./config/db'); 
@@ -11,21 +8,64 @@ const connectDB = require('./config/db');
 const app = express();
 
 // =========================================================================
-// 🌐 KONFIGURASI CORS EKSPLISIT UNTUK PROD & DEV
+// 🔒 PERBAIKAN KEAMANAN 1: Helmet.js - Security Headers
+// =========================================================================
+app.use(helmet());
+app.use(helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "'unsafe-inline'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    imgSrc: ["'self'", "data:", "https:"],
+  }
+}));
+
+// =========================================================================
+// 🔒 PERBAIKAN KEAMANAN 2: express-rate-limit - Batasi Request
+// =========================================================================
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 menit
+  max: 100, // maksimal 100 request per IP
+  message: {
+    success: false,
+    message: 'Terlalu banyak permintaan, silakan coba lagi dalam 15 menit'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Terapkan ke semua endpoint
+app.use(generalLimiter);
+
+// Rate limit khusus login (lebih ketat)
+const loginLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 menit
+  max: 5, // maksimal 5 percobaan login per IP
+  message: {
+    success: false,
+    message: 'Terlalu banyak percobaan login, silakan coba lagi dalam 5 menit'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// =========================================================================
+// 🌐 PERBAIKAN KEAMANAN 3: CORS - Batasi Origin
 // =========================================================================
 app.use(cors({
-    origin: '*', // Mengizinkan semua origin agar komunikasi antar-cloud Vercel lancar
+    // ✅ GANTI '*' dengan URL frontend Anda
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token']
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token'],
+    credentials: true
 }));
 
 app.use(express.json()); 
 
 // =========================================================================
-// 🗄️ MANAJEMEN KONEKSI DATABASE (OPTIMAL UNTUK VERCEL SERVERLESS)
+// 🗄️ MANAJEMEN KONEKSI DATABASE
 // =========================================================================
 const hubungkanDatabaseProduksi = async () => {
-    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
     if (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2) {
         return;
     }
@@ -52,14 +92,12 @@ if (process.env.NODE_ENV === 'test') {
     const dbTestURI = process.env.MONGO_URI_TEST || 'mongodb://127.0.0.1:27017/bm_kurir_testing';
     mongoose.connect(dbTestURI).catch(() => {});
 } else if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
-    // Jalankan koneksi produksi jika berada di Vercel lingkungan live
     hubungkanDatabaseProduksi().catch(() => {});
 } else {
-    // Mode lokal/development
     connectDB();
 }
 
-// Middleware tambahan untuk menjamin database selalu siap sebelum rute diproses (Khusus Vercel)
+// Middleware untuk menjamin database selalu siap sebelum route diproses
 app.use(async (req, res, next) => {
     if ((process.env.NODE_ENV === 'production' || process.env.VERCEL) && mongoose.connection.readyState !== 1) {
         await hubungkanDatabaseProduksi();
@@ -71,6 +109,8 @@ app.use(async (req, res, next) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/pesanan', require('./routes/pesanan')); 
 
+// Terapkan rate limit ketat untuk login
+app.use('/api/auth/login', loginLimiter);
 
 // =========================================================================
 // 🩺 HEALTH CHECK ENDPOINT
@@ -85,9 +125,8 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-
 // =========================================================================
-// 🔄 PENYESUAIAN RUTE UPDATE PESANAN (MENDUKUNG ID KURIR STRING "BM001")
+// 🔄 PENYESUAIAN RUTE UPDATE PESANAN
 // =========================================================================
 app.put('/api/pesanan/update/:id', async (req, res) => {
     try {
@@ -129,20 +168,20 @@ app.put('/api/pesanan/update/:id', async (req, res) => {
     }
 });
 
-// Cek status server (Root path)
+// Root path
 app.get('/', (req, res) => {
     res.send('Server BM Kurir Aktif & Database Terkoneksi dengan Format ID Kustom!');
 });
 
 // =========================================================================
-// 🚀 PENGONDISIAN LISTEN PORT (HANYA BERJALAN JIKA BUKAN DI VERCEL LIVE)
+// 🚀 LISTEN PORT (HANYA JIKA BUKAN DI VERCEL)
 // =========================================================================
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {
-        console.log(`Server jalan di port ${PORT}`);
+        console.log(`Server berjalan di port ${PORT}`);
     });
 }
 
-// ⚠️ WAJIB DI EKSPORES: Agar Vercel Serverless Functions dapat mengenali app express ini
+// ⚠️ EKSPOR app untuk Vercel Serverless Functions
 module.exports = app;
